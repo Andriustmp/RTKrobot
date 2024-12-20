@@ -1,0 +1,16 @@
+[Unit]
+Description=RTK rtkrcv service
+After=network.target
+
+[Service]
+WorkingDirectory=/root/RTKLIB
+ExecStart=/root/RTKLIB/app/consapp/rtkrcv/gcc/rtkrcv -s -o /root/RTKLIB/app/consapp/rtkrcv/gcc/rtkrover.conf  -d /dev/null
+Restart=always
+RestartSec=10
+StandardOutput=null
+StandardError=null
+User=root
+Group=root
+
+[Install]
+WantedBy=multi-user.target

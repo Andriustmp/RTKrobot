@@ -1,0 +1,14 @@
+[Unit]
+Description=RTK str2str service
+After=network.target
+
+[Service]
+ExecStart=/home/USER_change/RTKLIB/app/consapp/str2str/gcc/str2str -in serial://ttyACM0:115200:8:n:1:off -out tcpsvr://192.168.25.11:1234
+Restart=always
+RestartSec=10
+StandardOutput=null
+StandardError=null
+User=USER_change
+
+[Install]
+WantedBy=multi-user.target
