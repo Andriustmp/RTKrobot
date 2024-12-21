@@ -44,4 +44,11 @@ How to compile arduino code:
 - Upload waiponts to directory: „RTKrobot\RTK mower\Software\Waypoints“
 - Run main python file „RTKrobot\RTK mower\Software\robotmain.py“
 - Graphical user interface is accessible via robotIP:8050
+
+**Todo list:**
+
+**references:**
+
+![python robotic](https://github.com/AtsushiSakai/PythonRobotics)
+ 
   
