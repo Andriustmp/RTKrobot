@@ -1,4 +1,4 @@
 # RTKrobot
 RTK lawn robot mower
 
-! [RTKlawnrobotmower] (/RTKmower_foto.jpg)
+![RTKmower_foto](doc/RTKmower_foto.jpg)
