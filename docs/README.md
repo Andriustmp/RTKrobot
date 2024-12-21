@@ -14,6 +14,7 @@ This autonomous lawn robot project is based on RTK navigation using its own RTK 
 
 
 **Hardware:**
+
 How to compile arduino code:
 - Disable PA11, PA12 USB serial comunication in STM core library in:
   Arduino\hardware\Arduino_STM32\STM32F1\cores\maple\usb_serial.cpp
