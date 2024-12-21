@@ -51,6 +51,6 @@ How to compile arduino code:
 
 ![python robotic lib ](https://github.com/AtsushiSakai/PythonRobotics)
 
-![Stanley path tracking] (http://isl.ecst.csuchico.edu/DOCS/darpa2005/DARPA%202005%20Stanley.pdf)
+![Stanley path tracking](http://isl.ecst.csuchico.edu/DOCS/darpa2005/DARPA%202005%20Stanley.pdf)
  
   
