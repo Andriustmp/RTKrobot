@@ -23,3 +23,6 @@ How to compile arduino code:
   - https://github.com/rogerclarkmelbourne/Arduino_STM32
   - https://github.com/jrowberg/i2cdevlib
   - https://github.com/DFRobot/DFRobot_LSM303
+- Copy customized library files to LSM303 lib, from „Customized LSM303 lib“ folder
+- The STlink adapter is used to load the program
+   
