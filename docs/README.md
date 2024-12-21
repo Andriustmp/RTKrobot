@@ -33,4 +33,15 @@ How to compile arduino code:
 - git clone https://github.com/rtklibexplorer/RTKLIB.git (using demo5_b34h version)
 - build the code, only the str2str app will be used
 - create and run the systemd service: „RTKrobot\Base station\rtkbase.service“
+
+(RTKmower)
+
+- With UBLOX u-center software load  NEO-M8T configuration from: „RTKrobot\NEO-M8T module config (u-center)\NEO-M8T  config Gps Galileo BeiDou 2Hz“
+- Create Wifi client to RTKbase station 
+- install rtklibexplorer software package
+- Copy and edit „rtkrcv“ configuration file from: „RTKrobot\RTK mower\rtklib rtkrcv config“ (ant2-pos1; ant2-pos2 )
+- create and run the systemd service: „RTKrobot\RTK mower\rtkrover.service“
+- upload waiponts to directory: „RTKrobot\RTK mower\Software\Waypoints“
+- run main python file „RTKrobot\RTK mower\Software\robotmain.py“
+- graphical user interface accessible via robotIP:8050
     
