@@ -20,6 +20,6 @@ How to compile arduino code:
   Arduino\hardware\Arduino_STM32\STM32F1\cores\maple\usb_serial.cpp
   comment out everything inside void USBSerial::begin(void)
 - Install required libraries:
-  *https://github.com/rogerclarkmelbourne/Arduino_STM32
-  *https://github.com/jrowberg/i2cdevlib
-  *https://github.com/DFRobot/DFRobot_LSM303
+  -https://github.com/rogerclarkmelbourne/Arduino_STM32
+  -https://github.com/jrowberg/i2cdevlib
+  -https://github.com/DFRobot/DFRobot_LSM303
