@@ -40,8 +40,8 @@ How to compile arduino code:
 - Create Wifi client to RTKbase station 
 - install rtklibexplorer software package
 - Copy and edit „rtkrcv“ configuration file from: „RTKrobot\RTK mower\rtklib rtkrcv config“ (ant2-pos1; ant2-pos2 )
-- create and run the systemd service: „RTKrobot\RTK mower\rtkrover.service“
-- upload waiponts to directory: „RTKrobot\RTK mower\Software\Waypoints“
-- run main python file „RTKrobot\RTK mower\Software\robotmain.py“
-- graphical user interface accessible via robotIP:8050
+- Create and run the systemd service: „RTKrobot\RTK mower\rtkrover.service“
+- Upload waiponts to directory: „RTKrobot\RTK mower\Software\Waypoints“
+- Run main python file „RTKrobot\RTK mower\Software\robotmain.py“
+- Graphical user interface is accessible via robotIP:8050
     
