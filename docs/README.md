@@ -26,5 +26,5 @@ How to compile arduino code:
 - Copy customized library files to LSM303 lib, from „Customized LSM303 lib“ folder
 - The STlink adapter is used to load the program
    
-**Software:**
+**Software:**\
   RTKbase
