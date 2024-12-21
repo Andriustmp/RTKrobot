@@ -49,7 +49,7 @@ How to compile arduino code:
 
 **References:**
 
-![python robotic lib ](https://github.com/AtsushiSakai/PythonRobotics)
+![Python robotic lib ](https://github.com/AtsushiSakai/PythonRobotics)
 
 ![Stanley path tracking](http://isl.ecst.csuchico.edu/DOCS/darpa2005/DARPA%202005%20Stanley.pdf)
  
