@@ -27,4 +27,10 @@ How to compile arduino code:
 - The STlink adapter is used to load the program
    
 **Software:**\
-     RTKbase
+(RTKbase)
+
+- With UBLOX u-center software load  NEO-M8T configuration from: „RTKrobot\NEO-M8T module config (u-center)\NEO-M8T  config Gps Galileo BeiDou 2Hz“
+- git clone https://github.com/rtklibexplorer/RTKLIB.git (using demo5_b34h version)
+- build the code, only the str2str app will be used
+- create and run the systemd service: „RTKrobot\Base station\rtkbase.service“
+    
