@@ -6,10 +6,15 @@ This autonomous lawn robot project is based on RTK navigation using its own RTK 
 
 **Project objectives:**
 
-- rtklib- based autonomous lawn robot
-- Using NEO-M8T GNSS receivers 
-- Robust design for larger areas ( minimum 4 hours of work per charge )
-- Hardware WDT if main program is down 
+- rtklib-based autonomous lawn robot
+- Using NEO-M8T GNSS receivers
 - Python main programming language 
-- Hardware part based on arduino  ( STM32 Blue Pill )
 - WEB-based user interface  ( Dash framework for GUI )
+- Robust design for larger areas ( minimum 4 hours of work per charge )
+
+
+**Hardware:**
+How to compile arduino code:
+- Disable PA11, PA12 USB serial comunication in STM core library in:
+  Arduino\hardware\Arduino_STM32\STM32F1\cores\maple\usb_serial.cpp
+  comment out everything inside void USBSerial::begin(void)
