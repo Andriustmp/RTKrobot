@@ -49,7 +49,7 @@ How to compile arduino code:
 
 **References:**
 
-![Python robotic lib ](https://github.com/AtsushiSakai/PythonRobotics)
+https://github.com/AtsushiSakai/PythonRobotics
 
 http://isl.ecst.csuchico.edu/DOCS/darpa2005/DARPA%202005%20Stanley.pdf
  
