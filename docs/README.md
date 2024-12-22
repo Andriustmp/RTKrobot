@@ -50,6 +50,11 @@ How to compile arduino code:
 
 **Todo list:**
 
+- [ ]  Add obstacle avoidance function
+- [ ]  Add battery monitoring function
+- [ ]  Fix the event logging part
+- [ ]  combine wheel encoder data with gnss position data for more accurate navigation
+
 **References:**
 
 https://github.com/AtsushiSakai/PythonRobotics
