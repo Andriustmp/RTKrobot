@@ -1,8 +1,4 @@
 
 // tested: 8 months of continuous operation
 
-
-https://github.com/rtklibexplorer/RTKLIB/releases
-
- RTKLIB: demo5 b34h
-
+https://github.com/rtklibexplorer/RTKLIB/releases/tag/b34h
