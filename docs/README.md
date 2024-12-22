@@ -16,13 +16,14 @@ This autonomous lawn robot project is based on RTK navigation using its own RTK 
 **Hardware:**
 
 How to compile arduino code:
-- Disable PA11, PA12 USB serial comunication in STM core library in:
-  Arduino\hardware\Arduino_STM32\STM32F1\cores\maple\usb_serial.cpp
-  comment out everything inside void USBSerial::begin(void)
+
 - Install required libraries:
   - https://github.com/rogerclarkmelbourne/Arduino_STM32
   - https://github.com/jrowberg/i2cdevlib
   - https://github.com/DFRobot/DFRobot_LSM303
+- Disable PA11, PA12 USB serial comunication in STM core library in:
+  Arduino\hardware\Arduino_STM32\STM32F1\cores\maple\usb_serial.cpp
+  comment out everything inside void USBSerial::begin(void)
 - Copy customized library files to LSM303 lib, from „Customized LSM303 lib“ folder
 - The STlink adapter is used to load the program
    
@@ -30,7 +31,7 @@ How to compile arduino code:
 (RTKbase)
 
 - With UBLOX u-center software load  NEO-M8T configuration from: „RTKrobot\NEO-M8T module config (u-center)\NEO-M8T  config Gps Galileo BeiDou 2Hz“
-- git clone https://github.com/rtklibexplorer/RTKLIB.git (using demo5_b34h version)
+- git clone https://github.com/rtklibexplorer/RTKLIB/releases/tag/b34h
 - build the code, only the str2str app will be used
 - create and run the systemd service: „RTKrobot\Base station\rtkbase.service“
 
@@ -38,10 +39,12 @@ How to compile arduino code:
 
 - With UBLOX u-center software load  NEO-M8T configuration from: „RTKrobot\NEO-M8T module config (u-center)\NEO-M8T  config Gps Galileo BeiDou 2Hz“
 - Create Wifi client to RTKbase station 
-- install rtklibexplorer software package
+- clone, build rtklibexplorer software package (rtkrcv app)
 - Copy and edit „rtkrcv“ configuration file from: „RTKrobot\RTK mower\rtklib rtkrcv config“ (ant2-pos1; ant2-pos2 )
-- Create and run the systemd service: „RTKrobot\RTK mower\rtkrover.service“
-- Upload waiponts to directory: „RTKrobot\RTK mower\Software\Waypoints“
+- Copy and run the systemd service: „RTKrobot\RTK mower\rtkrover.service“
+- Create yard perimeter and waypoint drawings, export in WGS84 GeoJSON format
+- Upload your yard perimeter drawing to directory: „\assets“
+- Upload waiponts to directory: „\Waypoints“
 - Run main python file „RTKrobot\RTK mower\Software\robotmain.py“
 - Graphical user interface is accessible via robotIP:8050
 
