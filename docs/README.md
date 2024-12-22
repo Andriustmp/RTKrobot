@@ -31,15 +31,15 @@ How to compile arduino code:
 (RTKbase)
 
 - With UBLOX u-center software load  NEO-M8T configuration from: „RTKrobot\NEO-M8T module config (u-center)\NEO-M8T  config Gps Galileo BeiDou 2Hz“
-- git clone https://github.com/rtklibexplorer/RTKLIB/releases/tag/b34h
-- build the code, only the str2str app will be used
-- create and run the systemd service: „RTKrobot\Base station\rtkbase.service“
+- Git clone https://github.com/rtklibexplorer/RTKLIB/releases/tag/b34h
+- Build the code, only the str2str app will be used
+- Create and run the systemd service: „RTKrobot\Base station\rtkbase.service“
 
 (RTKmower)
 
 - With UBLOX u-center software load  NEO-M8T configuration from: „RTKrobot\NEO-M8T module config (u-center)\NEO-M8T  config Gps Galileo BeiDou 2Hz“
 - Create Wifi client to RTKbase station 
-- clone, build rtklibexplorer software package (rtkrcv app)
+- Clone, build rtklibexplorer software package (rtkrcv app)
 - Copy and edit „rtkrcv“ configuration file from: „RTKrobot\RTK mower\rtklib rtkrcv config“ (ant2-pos1; ant2-pos2 )
 - Copy and run the systemd service: „RTKrobot\RTK mower\rtkrover.service“
 - Create yard perimeter and waypoint drawings, export in WGS84 GeoJSON format
