@@ -213,11 +213,16 @@ public:
   vector<int16_t> magnetometer_max; ///< maximum magnetometer values, used for calibration
   vector<int16_t> magnetometer_min; ///< minimum magnetometer values, used for calibration
   
-  vector<float> accavg;
-  vector<float> accavgold;
-  vector<float> accavgnew;
-
   
+  vector<int16_t> accavgold;
+  vector<int16_t> accavgnew;
+  
+  
+  float  mag_x_offset;  //   magnetometer offset values from calibration 
+  float  mag_y_offset;  //  
+  float  mag_z_offset;  // 
+  
+
   /*!
    * @fn DFRobot_EC10
    * @brief Constructor 
@@ -289,6 +294,9 @@ public:
    * @return the value of drift angle.
    */
   float getNavigationAngle(void);
+  void readAcc(void);
+  void readMag(void);
+  void setMagOffset(float x, float y, float z);
 
 private:
   TwoWire* p_wire;  // ------ Pridedam del I2C2 objekto
@@ -311,14 +319,14 @@ private:
   byte readMagReg(int reg);
   void writeReg(byte reg, byte value);
   byte readReg(int reg);
-  void readAcc(void);
-  void readMag(void);
+  
+  float MovAverageX(int16_t new_value);
+  float MovAverageY(int16_t new_value);
+  float MovAverageZ(int16_t new_value);
+  float headingold;
+  
+  
 };
-
-
-
-
-
 
 
 

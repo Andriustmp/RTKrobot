@@ -1,5 +1,5 @@
 /*
- RTK robot fm ver: 1.2
+ RTK robot firmware ver: 1.3
  Autor: Andrius Besusparis 
  2024-02-21
 
@@ -12,21 +12,26 @@
 
  customization DFRobot_LSM303 library:
    DFRobot_LSM303()  -->  added &Wire2 obj
-   readAcc(void)     -->  added LPF and AVG filter for acc readings
- 
+   readAcc(void)     -->  added LPF and moving average filter for acc readings
+   setMagOffset()    -->  Hard Iron offsets (x, y, z) from PJRC Motioncal software
 */
 
 #include "HardwareTimer.h"
-//-------------------------
 #include "I2Cdev.h"
 #include "MPU6050_6Axis_MotionApps20.h"
+//#include <OneWireSTM.h>               // for DS18
+#include <DFRobot_LSM303.h>             
+#include <Wire.h>
+#include <math.h>
+
 #if I2CDEV_IMPLEMENTATION == I2CDEV_ARDUINO_WIRE
     #include "Wire.h"
 #endif
 
-
 TwoWire Wire2(2,I2C_FAST_MODE );  // I2C_FAST_MODE (400 kHz), I2C port 2 ( PB10, PB11 )
 MPU6050 mpu(0x68, &Wire2);        // <-- use for AD0 low, but 2nd Wire (TWI/I2C) object
+
+DFRobot_LSM303 compass(&Wire2);
 
 #define OUTPUT_READABLE_YAWPITCHROLL
 //#define OUTPUT_READABLE_REALACCEL
@@ -50,25 +55,7 @@ VectorFloat gravity;    // [x, y, z]            gravity vector
 float euler[3];         // [psi, theta, phi]    Euler angle container
 float ypr[3];           // [yaw, pitch, roll]   yaw/pitch/roll container and gravity vector
 
-
-//---- MPU6050 interupt---
-volatile bool mpuInterrupt = false;     // indicates whether MPU interrupt pin has gone high
-void dmpDataReady() {
-    mpuInterrupt = true;
-}
-
-//------------------------------
-//#include <OneWireSTM.h>         // for DS18
-#include <DFRobot_LSM303.h>       // I2C mag sensor
-#include <Wire.h>
-#include <math.h>
-
-//magnetometer_min = (DFRobot_LSM303::vector<int16_t>){-32767, -32767, -32767};
-//magnetometer_max = (DFRobot_LSM303::vector<int16_t>){+32767, +32767, +32767};
-
-DFRobot_LSM303 compass(&Wire2);
-
-void interuptas(void);
+//------------ global ------ 
 byte Ebutton=0;           // E stop from button
 byte Esensor=0;           // E stop from sensor
 byte ESTOP=0;             // All motors Estop bit
@@ -76,7 +63,7 @@ byte ESTOP=0;             // All motors Estop bit
 int  PWM1=0;              // L motor pwm
 int  PWM2=0;              // R motor pwm
 
-bool M1dirSet=true;       // Command from serial input     
+bool M1dirSet=true;       // Command from serial      
 bool M2dirSet=true;       // true - fwd; false - rev 
 bool M1dir=true;          // true - fwd; false - rev 
 bool M2dir=true;
@@ -85,87 +72,46 @@ bool M2stop=false;
 
 bool M1dirold=true;       // For direction change delay.
 bool M2dirold=true;
-
-int Dir1cnt=2;            // fast fix
-int Dir2cnt=2;
-int Dir1cnt2=3;
-int Dir2cnt2=3;
-
 bool cutMot=false;        // Cutting motor  ON/OFF
-int  rxWdt=0;             // If serial not active turn motors off
 
+int  rxWdt=0;             // If serial not active turn motors off
 bool WdtStop=true;        // Serial com check 
 
-int setimp1=0;            // M1 speed encoder imp/100ms ( 80~ imp/100ms - 0.8m/s - 2.88 kmh )
-int setimp2=0;
+int  setimp1=0;           // M1 speed encoder imp/100ms ( 80~ imp/100ms - 0.8m/s - 2.88 kmh )
+int  setimp2=0;
 
-int BatU=0;               // Battery voltage (avg ) Fixed point
-int BatI=0;  
-int Batlow=100;           // 10.0V  Battery voltage minimum V
+int  BatU=0;              // Battery voltage (avg ) Fixed point
+int  BatI=0;  
+int  Batlow=100;          // 10.0V  Battery voltage minimum V
 unsigned long t100ms=0;   // 100 ms tick 
 unsigned long t100ms2=0;  // 100 ms tick2 
-
-unsigned long time = 0;  
-
-float  diravg= -1;           // Compass direction avg 
-int    avgcnt=1; 
-float  dir1=0;               // magnetometer direction 
-unsigned int  dir1fused=0;   // Fused magnetometer and IMU direction
-  
-//------------- Compass  -----------
 char  report[120]; 
-float old=0;
-float new2=0;
-int   diff=0;
-int   angle=0;
-int   b=0;
+ 
+int    avgcnt=1; 
+float  LSM303heading=0;               // Data from Magnetometer (tilt compensated) 
+unsigned int  LSM303headingfused=0;   // Fused magnetometer and IMU heading
 
-void Compass1()  // 3 ms
-{
-  compass.read();    // Read MAG + ACC (LPF) reg
-  avgcnt++;
+// ----------- MPU6050 interupt -----
+// indicates whether MPU interrupt pin has gone high
+volatile bool mpuInterrupt = false;     
+void dmpDataReady() {
+    mpuInterrupt = true;
+}
+ 
+//------------- Compass  ------------
+void LSM303_Compass()     // ~3ms loop
+{  
+  compass.readAcc(); 
+  avgcnt++; 
   if(avgcnt>=45)
   {
-   float new1= compass.getNavigationAngle();  // After ~ 135 ms get Heading angle
-   //new2=int(0.7*old)+int(0.3*head1);        // LPF
-   //old=new2;
-  
-   //diff = (( int(new1) - b + 180 + 360) % 360) - 180;
-   // //angle = (360 + b + ( int(diff / 2) )) % 360;
-   //angle = (360 + b + ( int(0.5*(diff / (0.5+0.5))) )) % 360;   // angular averange ( int(0.5*(diff / (0.5+0.5)))
-   //b=angle;
-
-   dir1=new1;  //new1;
-   //Serial2.print("Dir Angle: ");
-   //Serial2.println(dir1);  
+   compass.readMag(); 
+   LSM303heading= compass.getNavigationAngle();   // After ~ 135 ms get Heading angle
+   //Serial2.println(LSM303heading);  
    avgcnt=0;   
   }    
 }
-
-DFRobot_LSM303::vector<int16_t> magmin;   //compass.magnetometer.magnetometer_min;
-// magmin=compass.magnetometer_min;
-DFRobot_LSM303::vector<int16_t> magmax;   //compass.magnetometer.magnetometer_min;
-// magmin=compass.magnetometer_min;
-// 11:38:56.179 -> Xmin: -650 Ymin: -705 Zmin: -489
-
-void CompassCal()
-{
-  compass.read();
- // snprintf(report, sizeof(report), "Acceleration:(X:%6d Y:%6d Z:%6d) Magnetometer:(X:%6d Y:%6d Z:%6d)",
- // compass.accelerometer.x, compass.accelerometer.y, compass.accelerometer.z,
- // compass.magnetometer.x, compass.magnetometer.y, compass.magnetometer.z);
- // Serial2.println(report);
-  if (compass.magnetometer.x < magmin.x) magmin.x = compass.magnetometer.x; 
-  if (compass.magnetometer.x > magmax.x) magmax.x = compass.magnetometer.x ;
-
-  if (compass.magnetometer.y < magmin.y) magmin.y = compass.magnetometer.y;
-  if (compass.magnetometer.y > magmax.y) magmax.y = compass.magnetometer.y ;
-
-  if (compass.magnetometer.z < magmin.z) magmin.z = compass.magnetometer.z;
-  if (compass.magnetometer.z > magmax.z) magmax.z = compass.magnetometer.z ;
-  delay(200);
-}
-//------------ Encoder stuff --------------
+//------------ Encoder stuff ---------
 #define PPR   600              // Encoder pulses/rev
 HardwareTimer timer(1);        // Optical Encoder 1 ( L motor )
                                // Optical Encoder 2 ( R motor ) Implemented in maple Core
@@ -277,8 +223,8 @@ void setup() {
   digitalWrite(PA6, HIGH);
 
   //---- Analog In ---------
-  pinMode(PA4, INPUT_ANALOG);     // U Bat
-  //pinMode(PA5, INPUT_ANALOG);   // I Bat
+  pinMode(PA4, INPUT_ANALOG);     // U Bat ( not used )  todo: Data from BMS
+  //pinMode(PA5, INPUT_ANALOG);   // I Bat ( not used )
 
   //--- Timer3  100 ms interupt ----
   Timer3.setMode(TIMER_CH1, TIMER_OUTPUTCOMPARE);
@@ -330,18 +276,18 @@ void setup() {
   Timer2.resume();                  //start the encoder... 
   Timer2.refresh();                 // Start position fix.
 
- //---------------
   Serial2.begin(19200);          // UART2  (PA4, PA3)
-  delay(500);
+  delay(200);
   MPU6050setup();                // TODO : tilt and impact emergency stop; com check stop !!!
   delay(200);
 
-  Serial2.println("HW_started V1.2");
-  delay(50);
-
- //----- Initialize Lsm303 ------- 
+  Serial2.println("HW_started V1.3");
+  delay(10);
+  
+ //----- Initialize LSM303 ------- 
   compass.init(DFRobot_LSM303::device_DLHC, DFRobot_LSM303::sa0_high); // device_DLH, device_DLM, device_DLHC, device_D, or device_auto
                                                                        // device_auto - hangs cpu ( NACK response lib problem )
+  compass.setMagOffset(-58.0, -217, -32.9);   // Hard Iron offsets (x, y, z)                                                                                        
   delay(200);
   compass.enable();
   delay(200);
@@ -351,7 +297,6 @@ void setup() {
 unsigned long interval=0;  
 unsigned long interval2=0;  
 char received = 0;
-uint32 a;
 
 long  imp1=0;
 long  imp2=0;
@@ -480,7 +425,7 @@ void Wdt()
 }
 
 //-------- Emergency STOP input -----
-void Avariniai()
+void EmergencyStop()
 {
   if( digitalRead(PA11) >=1 ) {      // "0" - ok "1"- stop
      Ebutton = 1;  
@@ -691,8 +636,8 @@ void UartTX()
  buf[3]=buf[3] | (BatU & 0x0f);              // L byte
  buf[4]=buf[4] | (BatI >> 4);                // H byte
  buf[5]=buf[5] | (BatI & 0x0f);              // L byte
- buf[6]=buf[6] | (dir1fused >> 4);           // H byte
- buf[7]=buf[7] | (dir1fused & 0x0f);         // L1 byte
+ buf[6]=buf[6] | (LSM303headingfused >> 4);           // H byte
+ buf[7]=buf[7] | (LSM303headingfused & 0x0f);         // L1 byte
 
  buf[8]=buf[8] | (Encoder1cnt >>24) & 0xff;  // M1 encoder cnt
  buf[9]=buf[9] | (Encoder1cnt >>16) & 0xff;
@@ -717,35 +662,35 @@ void UartTX()
  // compass.accelerometer.x, compass.accelerometer.y, compass.accelerometer.z,
  // compass.magnetometer.x, compass.magnetometer.y, compass.magnetometer.z); 
 }
-//------------------ Magnetometer + IMU Sensor data fussion -----------------------------------------------
+//------------------ Magnetometer + IMU Sensor data fussion -------------------------------------------
 float yawimu=0;
 float yawimu1=0;
 float yawimuold=0;
 float yaw2old=0;
-float delta3;
-float dif1=0;
 float yaw2=0;
 float yawdif=0;
 int   steady=0;
 
-void Fusion()
+void Compass_Imu_Fusion()
 {
-   yawimu1=yawimu;       //+180;  // MPU6050 (mpu -180+180)   
-   if (steady <1000)     // Wait 3s, 
+   yawimu1=yawimu;       // MPU6050 (mpu -180+180)   
+   if (steady <333)      // Wait ~1s, 
     {
-      yawdif=dir1;
-      yaw2=dir1;
+      yawdif=LSM303heading;
+      yaw2=LSM303heading;
       yawimuold=yawimu;
-    }
-        
-   if (steady >=1000)
+    }      
+   if (steady >=333)
     {
        yawdif=(yawimu1-yawimuold); 
-       yaw2=(0.995*(yawdif+yaw2old))+(0.005*dir1);   // Fuse IMU and MAG angle  0.995
+       yaw2=(0.995*(yawdif+yaw2old))+(0.005*LSM303heading);   // Fuse IMU and MAG angle  0.995
 
-       if(abs(yaw2-dir1)>100)                        // for 0-360 rapid angle change
+       if (yaw2>360) yaw2=360;
+       if (yaw2<0) yaw2=0;
+
+       if(abs(yaw2-LSM303heading)>250)                        // for 0-360 rapid angle change
         {
-          yaw2old=dir1;
+          yaw2old=LSM303heading;
           yawimuold=yawimu1;  
         }
        else 
@@ -753,19 +698,17 @@ void Fusion()
           yaw2old=yaw2;
           yawimuold=yawimu1; 
         }
-
-       dir1fused=int(yaw2);
-       //Serial2.print(dir1);
+       LSM303headingfused=int(trunc(yaw2));
+       
+       //Serial2.print(LSM303heading);
        //Serial2.print(',');
-       //Serial2.print(yawimu1);
+       //Serial2.print(yawdif);
        //Serial2.print(',');
-       //Serial2.println(yaw2);   
-       //Serial2.println(CpuTime());
+       //Serial2.println(LSM303headingfused);   
+       
     }
-
   steady ++;
-  if (steady >1000) steady =1000;
-     
+  if (steady >333) steady =334;    
 }
 // ----------------------- IMU (DMP mode ) --------------
 void MPU6050run(){
@@ -803,10 +746,9 @@ void MPU6050run(){
             Serial2.print(",");
             Serial2.println(aaReal.z);
         #endif
-   }  
-    
+   }    
 }
-//----------------------------
+//------- tmp-----
 int t3=0;
 int t4=0;
 int t5=0;
@@ -817,32 +759,28 @@ int CpuTime()   // for debug.
   t3=t4;
   return t5;
 }
-//-----------------------------------------
 //---------------- Main loop --------------
-//-----------------------------------------
-int cnt5=0;
 void loop()   // Loop time ~ 153-1732 us
 {
-  Avariniai();
+  EmergencyStop();
   LED();
   UartRX();
   
-//CompassCal();   // only for mag calibration
   if (millis() - interval2 >= 200)
   { 
    AnalogIn();
-   UartTX();               // Trasnsmit telemetry data 
+   UartTX();                              // Trasnsmit telemetry data 
    interval2 = millis();  
+   digitalWrite(PC13, !digitalRead(PC13));  // STM Board Led blink
   }
   
-  if (millis() - interval >= 3)     // update @~3ms    MAG-7.5 Hz (133ms ); ACC-400 hz (2.5 ms)
+  if (millis() - interval >= 3)             // update @~3ms    MAG-7.5 Hz (133ms ); ACC-400 hz (2.5 ms)
   { 
     //CpuTime();   
-     Compass1();
+     LSM303_Compass();
      MPU6050run();
-     Fusion();
-     interval = millis();                     // update interval 
-     digitalWrite(PC13, !digitalRead(PC13));  // STM Board Led blink
+     Compass_Imu_Fusion();
+     interval = millis();                   
   }
   
 }

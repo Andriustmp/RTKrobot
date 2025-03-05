@@ -26,21 +26,24 @@ DFRobot_LSM303::DFRobot_LSM303(TwoWire* p_wire)
   this->p_wire = p_wire;  //--- pridedam
   
   p_wire->begin();
+   
+  // magnetometer_min = (DFRobot_LSM303::vector<int16_t>){-659, -725, -598};
+  // magnetometer_max = (DFRobot_LSM303::vector<int16_t>){+523, +442, +472};
   
-  //magnetometer_min = (DFRobot_LSM303::vector<int16_t>){-32767, -32767, -32767};
-  //magnetometer_max = (DFRobot_LSM303::vector<int16_t>){+32767, +32767, +32767};
+  magnetometer_min = (DFRobot_LSM303::vector<int16_t>){0, 0, 0};
+  magnetometer_max = (DFRobot_LSM303::vector<int16_t>){0, 0, 0};
   
-  // ant roboto
-  // min: {  -699,   -752,   -596}    max: {  +487,   +420,   +467} - nelabai
 
-  
-  magnetometer_min = (DFRobot_LSM303::vector<int16_t>){-659, -725, -598};
-  magnetometer_max = (DFRobot_LSM303::vector<int16_t>){+523, +442, +472};
-  
-  
   _device = device_auto;
   io_timeout = 0;  ///< 0 = no timeout
   did_timeout = false;
+}
+
+void DFRobot_LSM303::setMagOffset(float x, float y, float z)
+{
+  mag_x_offset= x;
+  mag_y_offset= y;
+  mag_z_offset= z;
 }
 
 ///< Did a timeout occur in readAcc(), readMag(), or read() since the last call to timeoutOccurred()?
@@ -207,19 +210,19 @@ void DFRobot_LSM303::enable(void)
   }
   else
   {
-    ///< Accelerometer !!!!
+    /// -------- Accelerometer  model used  ------
     if (_device == device_DLHC)
     {
       ///< 0x08 = 0b00001000 2g
       ///< FS = 00 (+/- 2 g full scale); HR = 1 (high resolution enable)
 	  // 0x18  = +- 4g 
 	  // FS +- 16g 0x38
-	  // 0x28 - 8g
-      writeAccReg(CTRL_REG4_A, 0x28);
+
+      writeAccReg(CTRL_REG4_A, 0x18); // 0x28 - 8g
       ///< 0x47 = 0b01000111
       ///< ODR = 0100 (50 Hz ODR); LPen = 0 (normal mode); Zen = Yen = Xen = 1 (all axes enabled)
-	  // 400 hz = 0x77
-      writeAccReg(CTRL_REG1_A, 0x77);  
+	  
+      writeAccReg(CTRL_REG1_A, 0x77);  // 400 hz = 0x77
 	  // - filtras
 	  // FDS on- 0x08
 	  writeAccReg(CTRL_REG2_A, 0x00);
@@ -242,9 +245,9 @@ void DFRobot_LSM303::enable(void)
 	// 15 hz = 0x10
     writeMagReg(CRA_REG_M, 0x0C);
 
-    ///< 0x20 = 0b00100000
-    ///< GN = 001 (+/- 1.3 gauss full scale)
-    writeMagReg(CRB_REG_M, 0x20);
+    ///< 0x20 = 0b00100000 
+    ///< GN = 001 
+    writeMagReg(CRB_REG_M, 0x20);   // (+/- 1.3 gauss full scale)
 
     ///< 0x00 = 0b00000000
     ///< MD = 00 (continuous-conversion mode)
@@ -332,11 +335,48 @@ byte DFRobot_LSM303::readReg(int reg)
     return readAccReg(reg);
   }
 }
-//------------------------------------------------
-///< Reads the 3 accelerometer channels and stores them in vector a
+//--------------------------------------------------------------------------
 
 int n=0;
 
+int i=0;
+int i2=0;
+int i3=0;
+const int size=25;
+long totalx;
+long totaly;
+long totalz;
+int16_t arrayx[size];
+int16_t arrayy[size];	
+int16_t arrayz[size];		
+
+float DFRobot_LSM303::MovAverageX(int16_t new_value)
+{
+  totalx -= arrayx[i];             
+  arrayx[i] = new_value; 
+  totalx += new_value;  
+  i = (i+1) % size;     
+  return (float) totalx / size;    	
+}
+
+float DFRobot_LSM303::MovAverageY(int16_t new_value)
+{
+  totaly -= arrayy[i2];
+  arrayy[i2] = new_value;    
+  totaly += new_value;        
+  i2 = (i2+1) % size;                
+  return (float) totaly / size;    	
+}
+
+float DFRobot_LSM303::MovAverageZ(int16_t new_value)
+{
+  totalz -= arrayz[i3];
+  arrayz[i3] = new_value;   
+  totalz += new_value;         
+  i3 = (i3+1) % size;                
+  return (float) totalz / size;    	
+}
+	
 void DFRobot_LSM303::readAcc(void)
 {
   p_wire->beginTransmission(acc_address);
@@ -371,47 +411,37 @@ void DFRobot_LSM303::readAcc(void)
   //accelerometer.y = (int16_t)(yha << 8 | yla); 
   //accelerometer.z = (int16_t)(zha << 8 | zla); 
   
-    //Serial2.print(accelerometer.x);
-    //Serial2.print(",");
-    //Serial2.print(accelerometer.y);
-    //Serial2.print(",");
-    //Serial2.println(accelerometer.z);
+  // ---------- Modified  ACC read,   LPF + rolling average(45X) ----------
   
- 
-  //------ Modified  (1x MAG_read ;  45x avg(LPF(ACC_read) )----
-  // 
-  //
+   float alfa=0.008;
    n++;
-   accavgnew.x=int((0.998*accavgold.x)+(0.002*(int16_t)(xha << 8 | xla)));    // LPF   0.95 ;  0.05
-   accavgnew.y=int((0.998*accavgold.y)+(0.002*(int16_t)(yha << 8 | yla)));    // 0.998 ; 0.002 - labai letas 
-   accavgnew.z=int((0.999*accavgold.z)+(0.001*(int16_t)(zha << 8 | zla)));  // x,y dif. from z mechanicly
- 
+   accavgnew.x=int(((1-alfa)*accavgold.x)+(alfa*(int16_t)(xha << 8 | xla)));    //  LPF    alfa=0.008; 
+   accavgnew.y=int(((1-alfa)*accavgold.y)+(alfa*(int16_t)(yha << 8 | yla)));    //  0.05 - to fast
+   accavgnew.z=int(((1-alfa)*accavgold.z)+(alfa*(int16_t)(zha << 8 | zla)));    //  x,y axes dif. from z mechanicly 
+   
    accavgold.x=accavgnew.x;
    accavgold.y=accavgnew.y;
    accavgold.z=accavgnew.z;
- 
-   accavg.x +=accavgold.x;
-   accavg.y +=accavgold.y;
-   accavg.z +=accavgold.z; 
+   
+   accelerometer.x =int(MovAverageX(accavgold.x));
+   accelerometer.y =int(MovAverageY(accavgold.y));
+   accelerometer.z =int(MovAverageZ(accavgold.z));
+   
+   /*
+   Serial2.print( (int16_t)(xha << 8 | xla));
+   Serial2.print(","); 
+   Serial2.print((int16_t)(yha << 8 | yla));
+   Serial2.print(","); 
+   Serial2.println((int16_t)(zha << 8 | zla));
+   */
     
-   if (n>=45)  //  - 133ms/~3ms  = 45 kartus
-   {
-	accelerometer.x = int(accavg.x/45);  
-	accelerometer.y = int(accavg.y/45);
-	accelerometer.z = int(accavg.z/45);
-
-	accavg.x=0;
-	accavg.y=0;
-	accavg.z=0;
-	n=0;
-
-    //Serial2.print(accelerometer.x);
-    //Serial2.print(",");
-    //Serial2.print(accelerometer.y);
-    //Serial2.print(",");
-    //Serial2.println(accelerometer.z);
-    }
-   //------------------------------- 
+   /*  
+   Serial2.print(accelerometer.x);
+   Serial2.print(","); 
+   Serial2.print(accelerometer.y);
+   Serial2.print(",");
+   Serial2.println(accelerometer.z);
+   */   
 }
 
 ///< Reads the 3 magnetometer channels and stores them in vector m
@@ -475,11 +505,17 @@ void DFRobot_LSM303::readMag(void)
   magnetometer.y = (int16_t)(yhm << 8 | ylm);
   magnetometer.z = (int16_t)(zhm << 8 | zlm);
   
-  //Serial2.print(magnetometer.x);
-  //Serial2.print(",");
-  //Serial2.print(magnetometer.y);
-  //Serial2.print(",");
-  //Serial2.println(magnetometer.z);
+  magnetometer.x -= mag_x_offset;     // -58.0
+  magnetometer.y -= mag_y_offset;     // -217
+  magnetometer.z -= mag_z_offset;     // -32.9
+  
+ /*
+  Serial2.print(magnetometer.x);
+  Serial2.print(",");
+  Serial2.print(magnetometer.y);
+  Serial2.print(",");
+  Serial2.println(magnetometer.z);
+ */ 
 }
 ///< Reads all 6 channels of the DFRobot_LSM303 and stores them in the object variables
 void DFRobot_LSM303::read(void)
@@ -496,42 +532,60 @@ float DFRobot_LSM303::getNavigationAngle(void)
   }
   else
   {
-	//Serial2.println("test");  
-    return heading((vector<int>){0, -1, 0});  //  {0, -1, 0});
+    return heading((vector<int>){0,-1, 0});  //  {0, -1, 0});
   }
 }
 
 void DFRobot_LSM303::vectorNormalize(vector<float> *a)
 {
-  float mag = sqrt(vectorDot(a, a));
+  float mag = sqrt(vectorDot(a, a));  // vector magnitude
   a->x /= mag;
   a->y /= mag;
   a->z /= mag;
 }
 
 //-----------------------------------------------------------------------------------------------
-template <typename T> float DFRobot_LSM303::heading(vector<T> from)
-{
-    vector<int32_t> temp_m = {magnetometer.x, magnetometer.y, magnetometer.z};
 
-    ///< subtract offset (average of min and max) from magnetometer readings
-    temp_m.x -= ((int32_t)magnetometer_min.x + magnetometer_max.x) / 2;
-    temp_m.y -= ((int32_t)magnetometer_min.y + magnetometer_max.y) / 2;
-    temp_m.z -= ((int32_t)magnetometer_min.z + magnetometer_max.z) / 2;
+template <typename T> float DFRobot_LSM303::heading(vector<T> from)
+{  
+   float alfa = 0.5;
+   int heading_filtered=0;
+   float heddif=0;
+   
+   vector<int32_t> temp_m = {magnetometer.x, magnetometer.y, magnetometer.z};
+   
+   temp_m.x = magnetometer.x;
+   temp_m.y = magnetometer.y;
+   temp_m.z = magnetometer.z;
 
     ///< compute E and N
     vector<float> E;
     vector<float> N;
-    vectorCross(&temp_m, &accelerometer, &E); // The cross product of North and Up vectors is East
+    vectorCross(&temp_m, &accelerometer, &E);   // The cross product of North and Up vectors is East
     vectorNormalize(&E);
     vectorCross(&accelerometer, &E, &N);
     vectorNormalize(&N);
 
     ///< compute heading
-    float heading = atan2(vectorDot(&E, &from), vectorDot(&N, &from)) * 180 / M_PI;
-    if (heading < 0) heading += 360;
+    float headingnew = atan2(vectorDot(&E, &from), vectorDot(&N, &from)) * 180 / M_PI;
+    if (headingnew < 0) headingnew += 360;
 	
-    return heading;
+	heddif=headingold - headingnew;
+	
+	 if (abs(heddif) <359 )         // 0-360 histerisis
+		{
+	     headingold=headingnew; 		
+		 heading_filtered=((1-alfa)*headingold)+(alfa*headingnew);	
+		
+		}
+		 else 
+		{ 		 
+		 headingold=headingold;
+	     heading_filtered=((1-alfa)*headingold)+(alfa*headingold);
+		} 
+		
+	//Serial2.println(heading_filtered);
+    return heading_filtered;
 }
 
 template <typename Ta, typename Tb, typename To> void DFRobot_LSM303::vectorCross(const vector<Ta> *a, const vector<Tb> *b, vector<To> *out)
