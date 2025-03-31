@@ -47,7 +47,7 @@ How to compile arduino code:
 
 **Todo list:**
 
-- [ ]  Add obstacle avoidance function
+- [x]  Add obstacle avoidance function ( only stop )
 - [ ]  Add battery monitoring function to GUI
 - [ ]  Fix the event logging part 
 - [ ]  combine wheel encoder data with gnss position data for more accurate navigation
