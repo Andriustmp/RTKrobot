@@ -47,44 +47,48 @@ uint16_t fifoCount;         // count of all bytes currently in FIFO
 uint8_t  fifoBuffer[64];    // FIFO storage buffer
 
 // orientation/motion vars
-Quaternion q;           // [w, x, y, z]         quaternion container
-VectorInt16 aa;         // [x, y, z]            accel sensor measurements
-VectorInt16 aaReal;     // [x, y, z]            gravity-free accel sensor measurements
-VectorInt16 aaWorld;    // [x, y, z]            world-frame accel sensor measurements
-VectorFloat gravity;    // [x, y, z]            gravity vector
-float euler[3];         // [psi, theta, phi]    Euler angle container
-float ypr[3];           // [yaw, pitch, roll]   yaw/pitch/roll container and gravity vector
+Quaternion q;              // [w, x, y, z]         quaternion container
+VectorInt16 aa;            // [x, y, z]            accel sensor measurements
+VectorInt16 aaReal;        // [x, y, z]            gravity-free accel sensor measurements
+VectorInt16 aaWorld;       // [x, y, z]            world-frame accel sensor measurements
+VectorFloat gravity;       // [x, y, z]            gravity vector
+float euler[3];            // [psi, theta, phi]    Euler angle container
+float ypr[3];              // [yaw, pitch, roll]   yaw/pitch/roll container and gravity vector
 
 //------------ global ------ 
-byte Ebutton=0;           // E stop from button
-byte Esensor=0;           // E stop from sensor
-byte ESTOP=0;             // All motors Estop bit
 
-int  PWM1=0;              // L motor pwm
-int  PWM2=0;              // R motor pwm
+byte Estop_button=0;       // E stop from button
+byte Estop_button_old=0;
+byte Estop_sensor=0;       // E stop from sensor
+byte Estop_inclinometer=0; // E stop from inclinometer function
+byte ESTOP=0;              // All motors Estop bit
 
-bool M1dirSet=true;       // Command from serial      
-bool M2dirSet=true;       // true - fwd; false - rev 
-bool M1dir=true;          // true - fwd; false - rev 
+int  PWM1=0;               // L motor pwm
+int  PWM2=0;               // R motor pwm
+
+bool M1dirSet=true;        // Command from serial      
+bool M2dirSet=true;        // true - fwd; false - rev 
+bool M1dir=true;           // true - fwd; false - rev 
 bool M2dir=true;
 bool M1stop=false;
 bool M2stop=false;
 
-bool M1dirold=true;       // For direction change delay.
+bool M1dirold=true;        // For direction change delay.
 bool M2dirold=true;
-bool cutMot=false;        // Cutting motor  ON/OFF
+bool cutMot=false;         // Cutting motor  ON/OFF
 
-int  rxWdt=0;             // If serial not active turn motors off
-bool WdtStop=true;        // Serial com check 
+int  rxWdt=0;              // If serial not active turn motors off
+bool WdtStop=true;         // Serial com check 
+int  inclination_limit=6;  // max inclination, Emergency STOP limit, (deg)
 
-int  setimp1=0;           // M1 speed encoder imp/100ms ( 80~ imp/100ms - 0.8m/s - 2.88 kmh )
+int  setimp1=0;            // M1 speed encoder imp/100ms ( 80~ imp/100ms - 0.8m/s - 2.88 kmh )
 int  setimp2=0;
 
-int  BatU=0;              // Battery voltage (avg ) Fixed point
+int  BatU=0;               // Battery voltage (avg ) Fixed point
 int  BatI=0;  
-int  Batlow=100;          // 10.0V  Battery voltage minimum V
-unsigned long t100ms=0;   // 100 ms tick 
-unsigned long t100ms2=0;  // 100 ms tick2 
+int  Batlow=100;           // 10.0V  Battery voltage minimum V
+unsigned long t100ms=0;    // 100 ms tick 
+unsigned long t100ms2=0;   // 100 ms tick2 
 char  report[120]; 
  
 int    avgcnt=1; 
@@ -99,7 +103,7 @@ void dmpDataReady() {
 }
  
 //------------- Compass  ------------
-void LSM303_Compass()     // ~3ms loop
+void LSM303_Compass()      // ~3ms loop
 {  
   compass.readAcc(); 
   avgcnt++; 
@@ -156,7 +160,7 @@ void MPU6050setup() {
     mpu.setXGyroOffset(220);
     mpu.setYGyroOffset(76);
     mpu.setZGyroOffset(-85);
-    mpu.setZAccelOffset(1788); // 1688 factory default for my test chip
+    mpu.setZAccelOffset(1788);   // 1688 factory default for chip, change !!
     //------
     //mpu.setRate(9);  // 4- 100 hz; 9 - 50 Hz
     
@@ -199,8 +203,9 @@ void MPU6050setup() {
     }
   
 }
-//------------- Init ------------------
+//------------- Init -------------
 void setup() {
+  enableDebugPorts();            // Disable JTAG poort, SW active 
   //Timer1 encoder input
   pinMode(PA9, INPUT);           // TIM1 channel A 
   pinMode(PA8, INPUT);           // TIM1 channel B 
@@ -215,9 +220,9 @@ void setup() {
   pinMode(PA7, OUTPUT);          // ERR LED red
   pinMode(PA6, OUTPUT);          // RUN LED green 
 
-  pinMode(PA11, INPUT_PULLUP);   // E- STOP Button
-  pinMode(PA12, INPUT_PULLUP);   // E- STOP Sensor 
-  
+  pinMode(PB4, INPUT);           // E-STOP Button
+  pinMode(PB5, INPUT);           // E-STOP Sensors 
+
   //--- External Status LED ----
   digitalWrite(PA7, HIGH);       // LOW - ON
   digitalWrite(PA6, HIGH);
@@ -276,18 +281,19 @@ void setup() {
   Timer2.resume();                  //start the encoder... 
   Timer2.refresh();                 // Start position fix.
 
-  Serial2.begin(19200);          // UART2  (PA4, PA3)
+  Serial2.begin(19200);             // UART2  (PA4, PA3)
   delay(200);
-  MPU6050setup();                // TODO : tilt and impact emergency stop; com check stop !!!
+  MPU6050setup();                
   delay(200);
 
-  Serial2.println("HW_started V1.3");
+  Serial2.println("HW_started V1.4");
   delay(10);
   
  //----- Initialize LSM303 ------- 
   compass.init(DFRobot_LSM303::device_DLHC, DFRobot_LSM303::sa0_high); // device_DLH, device_DLM, device_DLHC, device_D, or device_auto
                                                                        // device_auto - hangs cpu ( NACK response lib problem )
-  compass.setMagOffset(-58.0, -217, -32.9);   // Hard Iron offsets (x, y, z)                                                                                        
+                                                                       
+  compass.setMagOffset(-74.2, -207.7, -141.3);   // Hard Iron offsets (x, y, z)   (-74.2, -207.7, -141.3)                                                                                   
   delay(200);
   compass.enable();
   delay(200);
@@ -424,17 +430,35 @@ void Wdt()
   if(rxWdt>=20) WdtStop=false;  // Serial com resumed
 }
 
-//-------- Emergency STOP input -----
+//-------- Emergency STOP inputs -----
 void EmergencyStop()
 {
-  if( digitalRead(PA11) >=1 ) {      // "0" - ok "1"- stop
-     Ebutton = 1;  
+  if ((ESTOP==1)&&(digitalRead(PB4)>=1)&&(Estop_button_old==1))  // reset Emergency STOP
+     {
+       ESTOP=0;
+       Estop_inclinometer=0;
+       Estop_sensor=0;
+       Estop_button_old=0;
+     }
+  if( digitalRead(PB4) ==0 )        // "1" - ok "0"- stop  
+    {      
+     Estop_button = 1;
+     Estop_button_old=1;  
      ESTOP=1;
-  } 
-  if( digitalRead(PA12) >=1 ) {
-     Esensor = 1;  
+    }
+    else
+     {
+       Estop_button_old=0; 
+     }
+  if( digitalRead(PB5) >=1 )     // "0" - ok "1"- stop  
+    {
+     Estop_sensor = 1;  
      ESTOP=1;
-  }  
+    }  
+  if ( Estop_inclinometer) 
+    {
+     ESTOP=1;
+    }
 }
 
 //----------- Analog U/I -------------
@@ -465,13 +489,13 @@ void Motors()
 {
    if((ESTOP==0) &&( WdtStop==false)) 
    {     
-    digitalWrite(PB6, !M1dir);   // M1 direction, invert direction       
-    pwmWrite(PB8, PWM1 );        // M1 PWM
+    digitalWrite(PB6, !M1dir);        // M1 direction, invert direction       
+    pwmWrite(PB8, PWM1 );             // M1 PWM
     
-    digitalWrite(PB7, !M2dir);   // M2 direction, invert direction   
-    pwmWrite(PB9, PWM2 );        // M2 PWM
+    digitalWrite(PB7, !M2dir);        // M2 direction, invert direction   
+    pwmWrite(PB9, PWM2 );             // M2 PWM
        
-    //digitalWrite(PA5, cutMot);   // Cutting motor Start/Stop 
+    //digitalWrite(PA5, cutMot);      // Cutting motor Start/Stop 
     CuttingMotor(cutMot);  
    }
    else 
@@ -480,25 +504,25 @@ void Motors()
     setimp2=0;
     PWM1=0;
     PWM2=0;
-    pwmWrite(PB8, 0 );         // M1 PWM off
-    pwmWrite(PB9, 0 );         // M2 PWM off
+    pwmWrite(PB8, 0 );                // M1 PWM off
+    pwmWrite(PB9, 0 );                // M2 PWM off
     CuttingMotor(false);
-    digitalWrite(PA5, LOW);    // Cutting motor STOP  
+    digitalWrite(PA5, LOW);           // Cutting motor STOP  
     DelayStart=0;  
     DelayBuz=false;
    }  
 }
 
-void CuttingMotor(bool StartStop)   // Todo: motor current(load) monitoring
+void CuttingMotor(bool StartStop)     // Todo: motor current(load) monitoring
 {
   if (StartStop == true)
   {
     DelayStart++;
-    if (DelayStart<50)              // Enable buzzer before starting motor
+    if (DelayStart<50)                // Enable buzzer before starting motor
     {
       DelayBuz=true;
     }
-    if (DelayStart>=50)              // Buzzer off, start cutting motor
+    if (DelayStart>=50)               // Buzzer off, start cutting motor
     {
       DelayBuz=false;
       //Serial2.println(DelayStart);
@@ -508,7 +532,7 @@ void CuttingMotor(bool StartStop)   // Todo: motor current(load) monitoring
   } 
   else
   {
-    digitalWrite(PA5, LOW);    // Cutting motor STOP
+    digitalWrite(PA5, LOW);            // Cutting motor STOP
     DelayStart=0;
     DelayBuz=false;
   }
@@ -522,7 +546,7 @@ void LED()
 { 
   if (ESTOP>=1)
     {
-      digitalWrite(PA6, HIGH);  // Green LED OFF 
+      digitalWrite(PA6, HIGH);                 // Green LED OFF 
       setimp1=0;
       setimp2=0;
       if(t100ms2<4 ) digitalWrite(PA7, LOW);   // Red LED ON
@@ -530,7 +554,7 @@ void LED()
     }
     else
       {
-       digitalWrite(PA7, HIGH);  // Red LED OFF
+       digitalWrite(PA7, HIGH);                // Red LED OFF
       }
 
   if ((WdtStop>=1)&&(ESTOP==0))
@@ -541,23 +565,17 @@ void LED()
     
   if ((WdtStop==0)&&(ESTOP==0)&&(DelayBuz==0)) 
     {  
-     digitalWrite(PA6, LOW);    // Green LED ON 
+     digitalWrite(PA6, LOW);                   // Green LED ON 
     }
 
-  if (DelayBuz==true)           // For starting cut. motor sound
+  if ((DelayBuz==true)&&(ESTOP==0))            // For starting cut. motor sound
     {
       digitalWrite(PA6, HIGH);  // Green LED OFF 
       if(t100ms2<4 ) digitalWrite(PA7, LOW);   // Red LED ON
       if(t100ms2>4 ) digitalWrite(PA7, HIGH);  // Red LED OFF
-      
     }
-    else
-    {
-      digitalWrite(PA7, HIGH);  // Red LED OFF
-    }
-    
+        
 }
-
 //----------- Serial Comunication RX ---------
 // 7 bit packet:  "S"; Lmotor F/R; Lmotor speed;  Rmotor F/R; Rmotor speed; Run/Stop; "E"    // todo + CRC
 // test packet R  0X53 0x46 0x10 0x46 0x10 0x01 0x45 
@@ -628,23 +646,23 @@ void UartTX()
  memset(buf, 0, sizeof(buf));
  
  buf[0]='T';
- buf[1]=ESTOP;                               // Bendras Avarinis
- buf[1]=buf[1] | (Ebutton<<1);               // Avarinis mygtukas
- buf[1]=buf[1] | (Esensor<<2);               // Bamperis
+ buf[1]=ESTOP;                                  // Combined emergency
+ buf[1]=buf[1] | (Estop_button<<1);             // Emergency button
+ buf[1]=buf[1] | (Estop_sensor<<2);             // Emergency bumper
  
- buf[2]=buf[2] | (BatU>>4);                  // H byte
- buf[3]=buf[3] | (BatU & 0x0f);              // L byte
- buf[4]=buf[4] | (BatI >> 4);                // H byte
- buf[5]=buf[5] | (BatI & 0x0f);              // L byte
- buf[6]=buf[6] | (LSM303headingfused >> 4);           // H byte
- buf[7]=buf[7] | (LSM303headingfused & 0x0f);         // L1 byte
+ buf[2]=buf[2] | (BatU>>4);                     // H byte
+ buf[3]=buf[3] | (BatU & 0x0f);                 // L byte
+ buf[4]=buf[4] | (BatI >> 4);                   // H byte
+ buf[5]=buf[5] | (BatI & 0x0f);                 // L byte
+ buf[6]=buf[6] | (LSM303headingfused >> 4);     // H byte
+ buf[7]=buf[7] | (LSM303headingfused & 0x0f);   // L1 byte
 
- buf[8]=buf[8] | (Encoder1cnt >>24) & 0xff;  // M1 encoder cnt
+ buf[8]=buf[8] | (Encoder1cnt >>24) & 0xff;     // M1 encoder cnt
  buf[9]=buf[9] | (Encoder1cnt >>16) & 0xff;
  buf[10]=buf[10] | (Encoder1cnt >>8) & 0xff;
  buf[11]=buf[11] | (Encoder1cnt & 0xff); 
 
- buf[12]=buf[12] | (Encoder2cnt >>24) & 0xff; // M2 encoder cnt
+ buf[12]=buf[12] | (Encoder2cnt >>24) & 0xff;   // M2 encoder cnt
  buf[13]=buf[13] | (Encoder2cnt >>16) & 0xff;
  buf[14]=buf[14] | (Encoder2cnt >>8) & 0xff;
  buf[15]=buf[15] | (Encoder2cnt & 0xff); 
@@ -724,11 +742,12 @@ void MPU6050run(){
             //Serial2.println(ypr[0] * 180/M_PI);
              yawimu=ypr[0] * 180/M_PI;
             //Serial2.print("\t");
-           // Serial2.print(",");
-           // Serial2.print(ypr[1] * 180/M_PI);
+            //Serial2.print(",");
+            //Serial2.print(ypr[1] * 180/M_PI);
             //Serial2.print("\t");
-           // Serial2.print(",");
-           // Serial2.println(ypr[2] * 180/M_PI);
+            //Serial2.print(",");
+            //Serial2.println(ypr[2] * 180/M_PI);
+            //inclination(ypr[1],ypr[2]);
         #endif
 
         #ifdef OUTPUT_READABLE_REALACCEL
@@ -746,7 +765,43 @@ void MPU6050run(){
             Serial2.print(",");
             Serial2.println(aaReal.z);
         #endif
-   }    
+   }  
+     
+}
+//--------------------Inclination measurment for emergency stop----------
+float pitch_old;
+float roll_old;
+
+void inclination(float pitch, float roll)
+{
+   float inclination=0;
+   float tan_1=0;
+   float tan_2=0;
+   float alfa=0.01;
+   
+   //inclination = atan(sqrt(tan^2(roll)+tan^2(pitch)))
+   
+   pitch=(((1-alfa)*pitch_old)+(alfa*pitch)); 
+   pitch_old=pitch;
+   
+   roll=(((1-alfa)*roll_old)+(alfa*roll)); 
+   roll_old=roll;
+    
+   tan_1=tan(roll_old);
+   tan_2=tan(pitch_old);
+   inclination = atan(sqrt(tan_1*tan_1+tan_2*tan_2));   // rad
+   inclination=inclination * 180/M_PI;
+
+   if (steady >=333)
+   {
+     if  ( inclination >=inclination_limit )
+          Estop_inclinometer=1; 
+   } 
+  
+   //Serial2.println(inclination);                      // deg
+   //Serial2.print(pitch);
+   //Serial2.print(",");
+   //Serial2.println(roll);
 }
 //------- tmp-----
 int t3=0;
@@ -769,7 +824,7 @@ void loop()   // Loop time ~ 153-1732 us
   if (millis() - interval2 >= 200)
   { 
    AnalogIn();
-   UartTX();                              // Trasnsmit telemetry data 
+   UartTX();                                // Trasnsmit telemetry data 
    interval2 = millis();  
    digitalWrite(PC13, !digitalRead(PC13));  // STM Board Led blink
   }
@@ -780,6 +835,7 @@ void loop()   // Loop time ~ 153-1732 us
      LSM303_Compass();
      MPU6050run();
      Compass_Imu_Fusion();
+     inclination(ypr[1],ypr[2]);
      interval = millis();                   
   }
   
