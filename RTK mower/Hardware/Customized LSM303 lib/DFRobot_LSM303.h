@@ -214,9 +214,8 @@ public:
   vector<int16_t> magnetometer_min; ///< minimum magnetometer values, used for calibration
   
   
-  vector<int16_t> accavgold;
-  vector<int16_t> accavgnew;
-  
+  vector<float> accavg;
+
   
   float  mag_x_offset;  //   magnetometer offset values from calibration 
   float  mag_y_offset;  //  

@@ -218,11 +218,11 @@ void DFRobot_LSM303::enable(void)
 	  // 0x18  = +- 4g 
 	  // FS +- 16g 0x38
 
-      writeAccReg(CTRL_REG4_A, 0x18); // 0x28 - 8g
+      writeAccReg(CTRL_REG4_A, 0x08); // 0x28 - 8g
       ///< 0x47 = 0b01000111
       ///< ODR = 0100 (50 Hz ODR); LPen = 0 (normal mode); Zen = Yen = Xen = 1 (all axes enabled)
 	  
-      writeAccReg(CTRL_REG1_A, 0x77);  // 400 hz = 0x77
+      writeAccReg(CTRL_REG1_A, 0x77);  // 400 hz = 0x77; 50Hz =0x47 
 	  // - filtras
 	  // FDS on- 0x08
 	  writeAccReg(CTRL_REG2_A, 0x00);
@@ -337,12 +337,11 @@ byte DFRobot_LSM303::readReg(int reg)
 }
 //--------------------------------------------------------------------------
 
-int n=0;
-
 int i=0;
 int i2=0;
 int i3=0;
-const int size=25;
+const int size=45;       // 45
+const int reject_val=500;
 long totalx;
 long totaly;
 long totalz;
@@ -351,7 +350,14 @@ int16_t arrayy[size];
 int16_t arrayz[size];		
 
 float DFRobot_LSM303::MovAverageX(int16_t new_value)
-{
+{ 
+/*
+  int diff = accelerometer.x-new_value;
+  int diff_abs=abs(diff);
+  
+  if (diff_abs>reject_val) 
+	  new_value=new_value+diff;
+	*/  
   totalx -= arrayx[i];             
   arrayx[i] = new_value; 
   totalx += new_value;  
@@ -361,6 +367,13 @@ float DFRobot_LSM303::MovAverageX(int16_t new_value)
 
 float DFRobot_LSM303::MovAverageY(int16_t new_value)
 {
+/*	
+  int diff = accelerometer.y-new_value;
+  int diff_abs=abs(diff);
+  
+  if (diff_abs>reject_val) 
+	  new_value=new_value+diff;
+  */
   totaly -= arrayy[i2];
   arrayy[i2] = new_value;    
   totaly += new_value;        
@@ -370,13 +383,21 @@ float DFRobot_LSM303::MovAverageY(int16_t new_value)
 
 float DFRobot_LSM303::MovAverageZ(int16_t new_value)
 {
+/*	
+  int diff = accelerometer.z-new_value;
+  int diff_abs=abs(diff);
+  
+  if (diff_abs>reject_val) 
+	  new_value=new_value+diff;
+  */
+  
   totalz -= arrayz[i3];
   arrayz[i3] = new_value;   
   totalz += new_value;         
   i3 = (i3+1) % size;                
   return (float) totalz / size;    	
 }
-	
+   
 void DFRobot_LSM303::readAcc(void)
 {
   p_wire->beginTransmission(acc_address);
@@ -407,41 +428,33 @@ void DFRobot_LSM303::readAcc(void)
   ///< This no longer drops the lowest 4 bits of the readings from the DLH/DLM/DLHC, which are always 0
   ///< (12-bit resolution, left-aligned). The D has 16-bit resolution
   
-  //accelerometer.x = (int16_t)(xha << 8 | xla); 
-  //accelerometer.y = (int16_t)(yha << 8 | yla); 
-  //accelerometer.z = (int16_t)(zha << 8 | zla); 
+  // accelerometer.x = (int16_t)(xha << 8 | xla); 
+  // accelerometer.y = (int16_t)(yha << 8 | yla); 
+  // accelerometer.z = (int16_t)(zha << 8 | zla); 
   
   // ---------- Modified  ACC read,   LPF + rolling average(45X) ----------
-  
-   float alfa=0.008;
-   n++;
-   accavgnew.x=int(((1-alfa)*accavgold.x)+(alfa*(int16_t)(xha << 8 | xla)));    //  LPF    alfa=0.008; 
-   accavgnew.y=int(((1-alfa)*accavgold.y)+(alfa*(int16_t)(yha << 8 | yla)));    //  0.05 - to fast
-   accavgnew.z=int(((1-alfa)*accavgold.z)+(alfa*(int16_t)(zha << 8 | zla)));    //  x,y axes dif. from z mechanicly 
    
-   accavgold.x=accavgnew.x;
-   accavgold.y=accavgnew.y;
-   accavgold.z=accavgnew.z;
-   
-   accelerometer.x =int(MovAverageX(accavgold.x));
-   accelerometer.y =int(MovAverageY(accavgold.y));
-   accelerometer.z =int(MovAverageZ(accavgold.z));
-   
-   /*
-   Serial2.print( (int16_t)(xha << 8 | xla));
-   Serial2.print(","); 
-   Serial2.print((int16_t)(yha << 8 | yla));
-   Serial2.print(","); 
-   Serial2.println((int16_t)(zha << 8 | zla));
-   */
+   float alfa=0.01; // 
+ 
+   accavg.x =(1-alfa)*accavg.x+(alfa*(int16_t)(xha << 8 | xla));   
+   accavg.y =(1-alfa)*accavg.y+(alfa*(int16_t)(yha << 8 | yla));   
+   accavg.z =(1-alfa)*accavg.z+(alfa*(int16_t)(zha << 8 | zla));  //  x,y axes dif. from z mechanicly 
     
-   /*  
+   int accx_offset=accavg.x+220;                                  // accelerometer axis offsets
+   int accy_offset=accavg.y-1500;
+   int accz_offset=accavg.z+3500;
+      
+   accelerometer.x =int(MovAverageX(accx_offset));
+   accelerometer.y =int(MovAverageY(accy_offset));
+   accelerometer.z =int(MovAverageZ(accz_offset));
+   
+   /* 
    Serial2.print(accelerometer.x);
    Serial2.print(","); 
    Serial2.print(accelerometer.y);
    Serial2.print(",");
    Serial2.println(accelerometer.z);
-   */   
+   */     
 }
 
 ///< Reads the 3 magnetometer channels and stores them in vector m
@@ -505,9 +518,9 @@ void DFRobot_LSM303::readMag(void)
   magnetometer.y = (int16_t)(yhm << 8 | ylm);
   magnetometer.z = (int16_t)(zhm << 8 | zlm);
   
-  magnetometer.x -= mag_x_offset;     // -58.0
-  magnetometer.y -= mag_y_offset;     // -217
-  magnetometer.z -= mag_z_offset;     // -32.9
+  magnetometer.x -= mag_x_offset;     // compass.setMagOffset(-74.2, -207.7, -141.3);
+  magnetometer.y -= mag_y_offset;     // 
+  magnetometer.z -= mag_z_offset;     // 
   
  /*
   Serial2.print(magnetometer.x);
@@ -515,7 +528,8 @@ void DFRobot_LSM303::readMag(void)
   Serial2.print(magnetometer.y);
   Serial2.print(",");
   Serial2.println(magnetometer.z);
- */ 
+  */
+ 
 }
 ///< Reads all 6 channels of the DFRobot_LSM303 and stores them in the object variables
 void DFRobot_LSM303::read(void)
@@ -549,7 +563,7 @@ void DFRobot_LSM303::vectorNormalize(vector<float> *a)
 template <typename T> float DFRobot_LSM303::heading(vector<T> from)
 {  
    float alfa = 0.5;
-   int heading_filtered=0;
+   int   heading_filtered=0;
    float heddif=0;
    
    vector<int32_t> temp_m = {magnetometer.x, magnetometer.y, magnetometer.z};
@@ -569,19 +583,23 @@ template <typename T> float DFRobot_LSM303::heading(vector<T> from)
     ///< compute heading
     float headingnew = atan2(vectorDot(&E, &from), vectorDot(&N, &from)) * 180 / M_PI;
     if (headingnew < 0) headingnew += 360;
+	    
+	// Serial2.print(accelerometer.x);
+	// Serial2.print(",");
+	// Serial2.println(headingnew);
 	
 	heddif=headingold - headingnew;
 	
 	 if (abs(heddif) <359 )         // 0-360 histerisis
 		{
 	     headingold=headingnew; 		
-		 heading_filtered=((1-alfa)*headingold)+(alfa*headingnew);	
+		 heading_filtered=int(((1-alfa)*headingold)+(alfa*headingnew));	
 		
 		}
 		 else 
 		{ 		 
 		 headingold=headingold;
-	     heading_filtered=((1-alfa)*headingold)+(alfa*headingold);
+	     heading_filtered=int(((1-alfa)*headingold)+(alfa*headingold));
 		} 
 		
 	//Serial2.println(heading_filtered);
