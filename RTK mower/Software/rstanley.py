@@ -29,7 +29,7 @@ class State:
         self.yaw = yaw
         self.deltapast = 0
         self.v = v
-        self.target_idx = 42       # first robot target point,  (start location index =0 )
+        self.target_idx = 1       # first robot target point,  (start location index =0 )
         self.DistToTarg = 0        # distance (m) to next target
         self.DistToPrevTarg = 0    # distance (m) to previuosly target
         self.DistToTargMin = 99999
