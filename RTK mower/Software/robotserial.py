@@ -1,6 +1,6 @@
 
 """
- RTK robot mower V 1.1
+ RTK robot mower V 1.4
  Serial coms with robot MCU 
  2024 05 23
  author: A. Besusparis
@@ -14,17 +14,29 @@ class rserial(threading.Thread):
 
    def __init__(self, shared, shared2, shared3):
       self.ser = serial.Serial(port='/dev/ttyUSB0', baudrate=19200, bytesize=8, parity='N', stopbits=1, timeout=1)
+      #print("RX start")
       self.shared = shared
       self.shared2 = shared2
       self.shared3 = shared3
       
    def RXdata (self,lock):
-           while (True):  
-               if (self.ser.inWaiting() > 0):  
+           while (True):
+               
+               # Check if incoming bytes are waiting to be read from the serial input 
+               # buffer.
+               # NB: for PySerial v3.0 or later, use property `in_waiting` instead of
+               # function `inWaiting()` below!
+               if (self.ser.inWaiting() > 0):
                    # read the bytes 
                    self.data_str = self.ser.read(self.ser.inWaiting())   # dec format    #.decode('ascii')   # .hex()  # .decode('utf-8').rstrip()   
+                   # print the incoming string without putting a new-line
+                   # ('\n') automatically after every print()
+                   #print(data_str, end='') 
+                   #print(self.data_str)
                    self.decode(lock)
-                   
+                   # Optional, but recommended: sleep 10 ms (0.01 sec) once per loop to let 
+                   # other threads on your PC run during this time.
+               #self.ser.write('test1'.encode('utf-8'))
                time.sleep(0.01)
                self.TXdata(lock)
 
@@ -38,7 +50,7 @@ class rserial(threading.Thread):
                 txarray[2]=self.shared2.Lspeed
                 txarray[3]=ord(self.shared2.RmotorFR)
                 txarray[4]=self.shared2.Rspeed
-                txarray[5]=self.shared2.RunStop
+                txarray[5]=self.shared2.Cutter_RunStop
                 txarray[6]=0x45   # E 
 
                 self.ser.write(txarray)
@@ -60,17 +72,11 @@ class rserial(threading.Thread):
            cnt1=0
            cnt2=0
 
-
            if (len(self.data_str) ==17) and (self.data_str[0]==84)and (self.data_str[16]==69):  # dec
 
                if (self.data_str[1] & 0b1):   Estop2=1
                if (self.data_str[1] & 0b10):  Ebutton2=1
                if (self.data_str[1] & 0b100): Esensor2=1
-
-               #print("Estop:",self.data_str[1])
-               #print("estop2:",Estop2)
-               #print("ebutton2:",Ebutton2)
-               #print("esensor2:",Esensor2)
 
                BatU=self.data_str[2]<<4
                BatU=BatU | self.data_str[3]
@@ -111,4 +117,9 @@ class rserial(threading.Thread):
 
    def  AngleCorection(self, angle):
         angle_cor = (angle+self.shared3.compasss_corection)%360
-        return (angle_cor)            
+        return (angle_cor)
+
+                  
+
+               
+               

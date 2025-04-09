@@ -1,6 +1,5 @@
-
 """
- RTK robot mower V 1.1
+ RTK robot mower V 1.4
  TCP client to rtklib software
  2024 05 23
  author: A. Besusparis
@@ -14,7 +13,7 @@ import threading
 
 import datetime
 
-host = '192.168.25.12'
+host = '192.168.xx.xx'  #  change
 port = 5555
 
 RTKdata= ["0", "0", "0","0", "0", "0","0", "0", "0","0", "0", "0","0", "0", "0","0","0","0","0","0",]
@@ -22,12 +21,11 @@ RTKdata= ["0", "0", "0","0", "0", "0","0", "0", "0","0", "0", "0","0", "0", "0",
 class TCPconnect(threading.Thread):
     def __init__(self, shared, shared2, shared3, sock=None,):
 
-        self.shared = shared
+        self.shared  = shared
         self.shared2 = shared2
         self.shared3 = shared3
         if sock is None:
-            self.sock = socket.socket(
-                            socket.AF_INET, socket.SOCK_STREAM)
+            self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)                              
         else:
             self.sock = sock
 
@@ -47,7 +45,7 @@ class TCPconnect(threading.Thread):
         #print(data.decode())
 
     def run(self):
-        self.connect(host,port)
+        self.connect(host,port)   # todo:  reconect on fail/restart service
         while True:
            self.readlines()
 
@@ -55,8 +53,8 @@ class TCPconnect(threading.Thread):
         self.shared.PacketCnt+=1  
         self.shared.GPSTdate=RTKdata[0]
         self.shared.GPSTtime=RTKdata[1] 
-        self.shared.lat=float(RTKdata[2])+self.shared3.LatOfset 
-        self.shared.long=float(RTKdata[3])+self.shared3.LongOfset 
+        self.shared.lat=float(RTKdata[2])+self.shared3.LatOffset 
+        self.shared.long=float(RTKdata[3])+self.shared3.LongOffset 
         self.shared.height=float(RTKdata[4]) 
         self.shared.Q=int(RTKdata[5]) 
         self.shared.ns=int(RTKdata[6]) 

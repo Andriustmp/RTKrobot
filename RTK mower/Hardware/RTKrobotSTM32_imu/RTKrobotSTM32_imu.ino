@@ -79,7 +79,7 @@ bool cutMot=false;         // Cutting motor  ON/OFF
 
 int  rxWdt=0;              // If serial not active turn motors off
 bool WdtStop=true;         // Serial com check 
-int  inclination_limit=6;  // max inclination, Emergency STOP limit, (deg)
+int  inclination_limit=15; // max inclination, Emergency STOP limit, (deg) (6 - to low)
 
 int  setimp1=0;            // M1 speed encoder imp/100ms ( 80~ imp/100ms - 0.8m/s - 2.88 kmh )
 int  setimp2=0;
@@ -691,8 +691,8 @@ int   steady=0;
 
 void Compass_Imu_Fusion()
 {
-   yawimu1=yawimu;       // MPU6050 (mpu -180+180)   
-   if (steady <333)      // Wait ~1s, 
+   yawimu1=yawimu+180;       // MPU6050 (mpu -180+180)   
+   if (steady <333)         // Wait ~1s, 
     {
       yawdif=LSM303heading;
       yaw2=LSM303heading;
@@ -701,18 +701,23 @@ void Compass_Imu_Fusion()
    if (steady >=333)
     {
        yawdif=(yawimu1-yawimuold); 
+       if (abs(yawdif)>=250)                                  // for 0-360 rapid angle change
+         {
+           yawimuold=yawdif;
+           yawdif=0;        
+         }      
        yaw2=(0.995*(yawdif+yaw2old))+(0.005*LSM303heading);   // Fuse IMU and MAG angle  0.995
 
        if (yaw2>360) yaw2=360;
        if (yaw2<0) yaw2=0;
-
+       
        if(abs(yaw2-LSM303heading)>250)                        // for 0-360 rapid angle change
         {
           yaw2old=LSM303heading;
           yawimuold=yawimu1;  
         }
        else 
-        {
+        {       
           yaw2old=yaw2;
           yawimuold=yawimu1; 
         }
@@ -827,6 +832,12 @@ void loop()   // Loop time ~ 153-1732 us
    UartTX();                                // Trasnsmit telemetry data 
    interval2 = millis();  
    digitalWrite(PC13, !digitalRead(PC13));  // STM Board Led blink
+
+       //Serial2.print(LSM303heading);
+       //Serial2.print(',');
+       //Serial2.print(yawimu1);  // yawimu  ; yawdif
+       //Serial2.print(',');
+       //Serial2.println(LSM303headingfused);   
   }
   
   if (millis() - interval >= 3)             // update @~3ms    MAG-7.5 Hz (133ms ); ACC-400 hz (2.5 ms)
