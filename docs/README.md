@@ -21,9 +21,6 @@ How to compile arduino code:
   - https://github.com/rogerclarkmelbourne/Arduino_STM32
   - https://github.com/jrowberg/i2cdevlib
   - https://github.com/DFRobot/DFRobot_LSM303
-- Disable PA11, PA12 USB serial comunication in STM core library in:
-  Arduino\hardware\Arduino_STM32\STM32F1\cores\maple\usb_serial.cpp
-  comment out everything inside void USBSerial::begin(void)
 - Copy customized library files to LSM303 lib, from „Customized LSM303 lib“ folder
 - The STlink adapter is used to load the program
    
@@ -50,7 +47,7 @@ How to compile arduino code:
 
 **Todo list:**
 
-- [ ]  Add obstacle avoidance function
+- [x]  Add obstacle avoidance function ( only stop )
 - [ ]  Add battery monitoring function to GUI
 - [ ]  Fix the event logging part 
 - [ ]  combine wheel encoder data with gnss position data for more accurate navigation
