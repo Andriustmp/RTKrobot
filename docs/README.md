@@ -51,7 +51,7 @@ How to compile arduino code:
 - [ ]  Add battery monitoring function to GUI
 - [ ]  Fix the event logging part 
 - [ ]  combine wheel encoder data with gnss position data for more accurate navigation
-- [ ]  Adapt the control algorithm for sharp turns ( the stanley part works perfectly in straight lines, sharp angles are smoothed)
+- [x]  Adapt the control algorithm for sharp turns ( the stanley part works perfectly in straight lines, sharp angles are smoothed)
 
 **References:**
 
