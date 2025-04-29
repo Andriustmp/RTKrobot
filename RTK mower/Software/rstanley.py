@@ -11,48 +11,63 @@
 
 import math 
 import numpy as np
+import utm
 import sys
 import pathlib
 sys.path.append(str(pathlib.Path(__file__).parent.parent.parent))
 
-point_reached=0.10             # accept waypoint from this distance  10 cm...
-k  = 0.0013                    # theta_d (atstumo kor.) control gain  0.0013
-Kp = 0.25                      # PI speed controll  P 0.1
+point_reached=0.10             # accept waypoint from this distance  0.10m...
+
+Kp = 0.5                       # PI speed controll  P 0.25
 Ip = 0.01                      # PI speed controll  I 
+
+SafeZone=0.6                   # (m)
+
+max_steer = np.radians(150.0)  # [rad] max steering angle   
 
 class State:
     def __init__(self, x=0.0, y=0.0, yaw=0.0, v=0.0):
-        """Instantiate the object."""
         super().__init__()
-        self.x = x
-        self.y = y
-        self.yaw = yaw
-        self.deltapast = 0
-        self.v = v
-        self.target_idx = 1       # first robot target point,  (start location index =0 )
-        self.DistToTarg = 0        # distance (m) to next target
-        self.DistToPrevTarg = 0    # distance (m) to previuosly target
-        self.DistToTargMin = 99999
-        self.TargetSpeed = 0.4      # 0.4 [m/s]
-        self.TargetSpeed_set = 0
-        self.theta_e = 0
-        self.theta_d = 0
-        self.integral =0
+        self.x               = x
+        self.y               = y
+        self.yaw             = yaw
+        self.deltapast       = 0
+        self.v               = v
+        self.target_idx      = 1         # first robot target point,  (start location index =0 )
 
-    def update(self, long1, lat1 , yaw, speed, target_speed):   
-      
+        self.k_td            = 1.4       # theta_d ( atstumo kor.) lateral Error gain   1.3
+        self.k_te            = 0.65      # theta_e ( kampo kor. )  yaw     Error gain   0.8
+        self.Kstear          = 0.03      # steering overshoot compensation ( small value ) 
+
+        self.DistSegment     = 0         # current path length
+        self.Dist_safe       = True      # safety coridor on working path
+        self.DistToTarg      = 0         # distance (m) to next target
+        self.DistToPrevTarg  = 0         # distance (m) to previuosly target
+        self.DistToTargMin   = 99999
+        self.TargetSpeed     = 0.5       # 0.5 [m/s]  ( update from GUI )
+        self.TargetSpeed_set = 0
+        self.lateralError    = 0
+        self.theta_e         = 0  
+        self.theta_d         = 0
+        self.integral        = 0
+
+    def update(self, long1, lat1 , yaw, speed, target_speed, k_td, k_te, Kstear):   
         self.x= long1 
         self.y= lat1
         self.yaw= normalize_angle(np.radians(yaw))
         self.v= speed 
         self.TargetSpeed_set=target_speed
-
+        self.k_td=k_td
+        self.k_te=k_te
+        self.Kstear=Kstear
 
 #--------- PI for speed controll ------------
 def pid_control(target, current):
     speed=current
     dif=(target-current) 
     speed=current+dif*Kp
+
+    print("Speed dif :", dif)
 
     if(current<target) : speed+=Ip
     if(current>target) : speed-=Ip
@@ -76,37 +91,38 @@ def distance(state, lat1, lon1, lat2, lon2):     # lat - y; long - x
 #  -------------Stanley steering control-----------
 def stanley_control(state, cx, cy, cyaw, last_target_idx):
      
-    Ke     = 0.9         # yaw koefic
-    Kstear = 0.06        # buvo 0.1
-
+    Ke=state.k_te
     current_target_idx, error_front_axle = calc_target_index(state, cx, cy, last_target_idx)
-    
+
     if (current_target_idx >=last_target_idx):
         return  0, current_target_idx
-        
-
-    print("Current_Target_Idx: ", current_target_idx)
-    print("CurTarg_cyaw:",cyaw[current_target_idx])
-    print("yaw (rad):", state.yaw)
+    
+    yaw_dif=abs((cyaw[current_target_idx]+np.pi)-(state.yaw+np.pi))    
+    yaw_dif=np.pi-yaw_dif
 
     # theta_e corrects the heading error
     theta_e = normalize_angle(cyaw[current_target_idx] - state.yaw)    #  (output:  -pi : +pi) 
+    #theta_e = cyaw[current_target_idx] - state.yaw
 
-    if (state.TargetSpeed == 0.2):                                     # only in slow speds, more aggressive turn
-        Ke=1.5                                                         # ok for slow speed
+    if (abs(yaw_dif)<0.5):                                             # if robot facing oposite to course   (~ 28 deg window)  
+
+         theta_e=theta_e-yaw_dif                                   
+         
+    if (state.TargetSpeed == 0.23):                                    # only in slow speds, more aggressive turn
+        Ke=1.75                                                        # ok for slow speed  ( buvo 1.5)
     else:
-        Ke=0.8  
+        Ke=state.k_te                                                  # back to normal gain
 
-    print("theta_e (kampo kor.):",theta_e )
-    # theta_d corrects the cross track error
-    theta_d = np.arctan2(k * error_front_axle, 0.1+state.v)            # state.v  # (arctan2- vector to an angle ) ( arctan output:  -pi/2 : +pi/2 )
-    print("theta_d (atstumo kor.):",theta_d )
-
+    theta_d = np.arctan2(state.k_td * error_front_axle, 0.1+state.v)   
+    
     # Steering control
     delta = theta_e*Ke + theta_d 
-    delta = delta+ Kstear*(delta-state.deltapast)
+    delta = delta+ state.Kstear*(delta-state.deltapast)
+    #print("delta:",delta)
+
     state.theta_e=theta_e
     state.theta_d=theta_d
+
     state.deltapast=delta
     
     return delta, current_target_idx
@@ -114,25 +130,29 @@ def stanley_control(state, cx, cy, cyaw, last_target_idx):
 #-------------------------------------
 def calc_target_index(state, cx, cy, last_target_idx):
    
-    state.DistToTarg     = distance(state, state.y, state.x, cy[state.target_idx], cx[state.target_idx] ) 
-    state.DistToPrevTarg = distance(state, state.y, state.x, cy[state.target_idx-1], cx[state.target_idx-1] ) 
+    old_idx=state.target_idx
 
+    state.DistToTarg     = distance(state, state.y, state.x, cy[state.target_idx], cx[state.target_idx] ) 
+    state.DistToPrevTarg = distance(state, state.y, state.x, cy[state.target_idx-1], cx[state.target_idx-1] )
+    state.DistSegment    = distance(state, cy[state.target_idx], cx[state.target_idx], cy[state.target_idx-1], cx[state.target_idx-1] )
+    
     TargetColect(state)  
 
     if (state.target_idx >=last_target_idx) :
         return  state.target_idx, 0
 
-    print("dist_to_target:",state.DistToTarg)
-    print("dist_to_target_MIN:",state.DistToTargMin)
+    if(old_idx!=state.target_idx):
+        state.DistToTarg     = distance(state, state.y, state.x, cy[state.target_idx], cx[state.target_idx] ) 
+        state.DistToPrevTarg = distance(state, state.y, state.x, cy[state.target_idx-1], cx[state.target_idx-1] )
+        state.DistSegment    = distance(state, cy[state.target_idx], cx[state.target_idx], cy[state.target_idx-1], cx[state.target_idx-1] ) 
+        old_idx=state.target_idx
 
-    print(state.target_idx)
-
-    lateralError = distanceLineInfinite(state.x, state.y, cx[state.target_idx-1], cy[state.target_idx-1], cx[state.target_idx], cy[state.target_idx]);
-    lateralError = lateralError *75000000      # DD -> mm: 0.000001 ->75 mm
-    
-    error_front_axle=lateralError*-1
+    state.lateralError = distanceLineInfinite(state.x, state.y, cx[state.target_idx-1], cy[state.target_idx-1], cx[state.target_idx], cy[state.target_idx]); 
+    error_front_axle=state.lateralError*-1
     #print("error_front_axle:{:.2f} ".format(lateralError))
-
+     
+    DistanceSafety(state)
+     
     return state.target_idx, error_front_axle
 
 # ----------------------
@@ -143,27 +163,40 @@ def TargetColect(state):
 
        if(state.DistToTarg<1.5):  state.TargetSpeed = 0.4  
           
-       if(state.DistToTarg<0.7):  state.TargetSpeed = 0.2  
+       if(state.DistToTarg<0.7):  state.TargetSpeed = 0.23  
           
-       if(state.DistToTarg<=point_reached):    # <10 cm
-          print("target acquired ") 
+       if(state.DistToTarg<=point_reached):                    # <10 cm
+          print("target acquired  (target_idx, DistToTarg): ", state.target_idx, state.DistToTarg) 
           state.target_idx+=1
           state.DistToTargMin=99999
           
        else:
-            if (state.DistToTarg<0.6):                        # If going to miss target  
+            if (state.DistToTarg<0.6):                         # If going to miss target  
                 if(state.DistToTarg>state.DistToTargMin):
-                   print("target missed") 
+                   print("target missed (target_idx, DistToTarg): ",state.target_idx, state.DistToTarg) 
                    state.target_idx+=1
                    state.DistToTargMin=99999
                 else:   
                       if (state.DistToTargMin> state.DistToTarg ): 
                           state.DistToTargMin= state.DistToTarg 
                     
-#---------------------------------------------------
-
 # compute distance to (infinite) line (https://en.wikipedia.org/wiki/Distance_from_a_point_to_a_line#Line_defined_by_two_points)
 def distanceLineInfinite(px, py, x1, y1, x2, y2):
+    
+    p1 = []
+    p1 = utm.from_latlon(py,px)     # UTM 34U
+    px = p1[0]
+    py = p1[1]
+
+    x_1 = []
+    x_1 = utm.from_latlon(y1,x1)
+    x1  = x_1[0]
+    y1  = x_1[1]
+
+    x_2 = []
+    x_2 = utm.from_latlon(y2,x2)
+    x2  = x_2[0]
+    y2  = x_2[1]
 
     len1 = math.sqrt((y2-y1)**2+(x2-x1)**2)
 
@@ -171,31 +204,45 @@ def distanceLineInfinite(px, py, x1, y1, x2, y2):
        distToLine=0
     else: distToLine = ((y2-y1)*px-(x2-x1)*py+(x2*y1-y2*x1)) / len1
 
-    return distToLine
+    return distToLine    # (m)
 
 # ----------------------------    
-def distanceSafety(state):    # TODO
+def DistanceSafety(state):    
+    safe=True 
 
-    # lateralError <0.5m
-    # Target line crossing 
-    # prediction time     
+    if (abs(state.lateralError) > (SafeZone) ): 
+        safe=False  
+        print("Safe zone failed (target_idx, lateral_Error): ", state.target_idx, state.lateralError)
+
+    zone_forward=state.DistToPrevTarg-state.DistSegment    
+    zone_reverse=state.DistToTarg-state.DistSegment
+
+    if (zone_forward >SafeZone):
+        safe=False  
+        print("Safe zone failed (target_idx, zone_forward): ", state.target_idx, state.lateralError) 
+
+    if (zone_reverse >SafeZone):
+        safe=False  
+        print("Safe zone failed (target_idx, zone_reverse): ", state.target_idx, state.lateralError)
     
-    return 0           
+    state.Dist_safe=safe
+    return safe   
+
 
 def normalize_angle(angle):  
-    #Normalize an angle to [-pi, pi].
+    # Normalize an angle to [-pi, pi]
     mod_angle = (angle + np.pi) % (2 * np.pi) - np.pi
     return  mod_angle 
 
 #------------- Calc yaw for waypoints pairs ----     
 def yaw_calc(state, cx, cy, yaw):         
-    yaw_p=[0]  
+    yaw_p = [0]  
     for i in range(0,len(cx)-1):
 
-          long1=cx[i]
-          lat1 =cy[i]
-          long2=cx[i+1] 
-          lat2 =cy[i+1]
+          long1 = cx[i]
+          lat1  = cy[i]
+          long2 = cx[i+1] 
+          lat2  = cy[i+1]
 
           dLon = (long2 - long1)
           x = math.cos(math.radians(lat2)) * math.sin(math.radians(dLon))
@@ -204,25 +251,16 @@ def yaw_calc(state, cx, cy, yaw):
           #brng = np.degrees(brng)  # deg -180 + 180
           yaw_p.append(round(brng,3))
            
-    print("First point cy0: ",cy[0])  # to debug
-    print("First point cx0: ",cx[0])
-    print("Sec   point cy1: ",cy[1])
-    print("Sec   point cx1: ",cx[1])    
-
-
     return  yaw_p
 
 def calcmotion(state, cx, cy, cyaw):
        
      last_idx = len(cx)    
-     #print("idxxxx:",last_idx)
-
+     
      if  state.target_idx < last_idx:                 
-        
         ai = pid_control(state.TargetSpeed, state.v)
         di, state.target_idx = stanley_control(state, cx, cy, cyaw, last_idx)     # return delta, current_target_idx
- 
-        return ai, di                                                             # Return Linear (V) and angular(W)  to motors control
+        return ai, di, state.lateralError, state.Dist_safe                        # Return Linear (V) and angular(W)  to motors control
 
      else: 
-        return 0, 0    
+        return 0, 0, 0, True    

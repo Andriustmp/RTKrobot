@@ -37,14 +37,13 @@ class Robotmove(threading.Thread):
           self.oldpacketcnt2 = 0
 
           self.r = 0.125                #  wheel radius (m)
-          self.L = 0.45                 #  45 distance between wheels (m); 
+          self.L = 0.45                 #  45 distance between wheels (m); Auto mode: perjungimo atgal slenkstis, parenkam ( 0.45 -0.85 )
 
           # Initial robot state
           self.state = rstanley.State(x=0.0, y=0.0, yaw=np.radians(0.0), v=0.0)
           self.cx    = []
           self.cy    = []
           self.cyaw  = []
-
 
    @staticmethod
    def check_float(value):
@@ -60,7 +59,7 @@ class Robotmove(threading.Thread):
        hh, mm, ss = time_str.split(":")
        return int(hh) * 3600 + int(mm) * 60 + int(ss)
    
-   def GNSSvalidation(self):             # ---------- to optimize !!!
+   def GNSSvalidation(self):                         # ---------- to optimize !!!
        Newtime=0
        Timedif=0
        RecTimeS=0
@@ -80,7 +79,7 @@ class Robotmove(threading.Thread):
                RecTimeS=self.get_sec(self.shared1.GPSTtime[:-4])
                # GNSS reciver time is updated
                if(self.Oldtime2!=RecTimeS): 
-                   #print(RecTimeS)                                             
+                   #print(RecTimeS)                                          
                    # RTKLIB solution Q: fix=1; float-2,  valid sat>=8, solution ratio >=1.5
                    if(self.shared1.Q==1)and(self.shared1.ns>=8)and(self.shared1.ratio>=1.5):  ## add: sdn, sde - stabilitys for 3s (<0.08) 
                        # print("GNSS data valid:")
@@ -100,10 +99,26 @@ class Robotmove(threading.Thread):
            self.tick=False 
 
 
+   def LogData(self):
+       self.shared4.AddRecord(
+                              self.shared1.lat,
+                              self.shared1.long,
+                              self.shared1.Q,
+                              rstanley.normalize_angle(np.radians(self.shared2.Direction)),
+                              self.shared3.SpeedV_meas,       
+                              self.shared3.SpeedW,            # from stanley controll
+                              self.shared3.TargetIndex, 
+                              self.state.DistToTarg,
+                              self.state.theta_e,
+                              self.state.theta_d,
+                              self.shared3.PathLateralError*100           # (cm)
+                             )     
+           
+
    def SpeedMeasure(self):
        impmm_scale=1.0738
 
-       if (self.shared2.PacketCnt>self.oldpacketcnt):                           # @200 ms RX update
+       if (self.shared2.PacketCnt>self.oldpacketcnt):                     # @200 ms RX update
 
            diffL=abs(self.shared2.LWheelCnt-self.oldcntL)
            self.oldcntL=self.shared2.LWheelCnt
@@ -111,24 +126,16 @@ class Robotmove(threading.Thread):
            diffR=abs(self.shared2.RWheelCnt-self.oldcntR)
            self.oldcntR=self.shared2.RWheelCnt
 
-           self.shared2.SpeedV=round(((((diffL+diffR)/2)*impmm_scale)/1000)*5, 2)   #  Linear speed (m/s)
+           Speed_tmp=round(((((diffL+diffR)/2)*impmm_scale)/1000)*5, 2)   #  Linear speed (m/s) 
 
+           if (Speed_tmp <=1.5 ):
+              self.shared3.SpeedV_meas=Speed_tmp
+           else:
+              print("Speed measurement error: ",Speed_tmp )  
+           
            #print("SpeedV:",self.shared2.SpeedV)
            self.oldpacketcnt=self.shared2.PacketCnt 
 
-           #----- Log data ------
-           self.shared4.AddRecord(
-                                  self.shared1.lat,
-                                  self.shared1.long,
-                                  self.shared1.Q,
-                                  rstanley.normalize_angle(np.radians(self.shared2.Direction)),
-                                  self.shared3.SpeedV,
-                                  self.shared3.SpeedW,
-                                  self.shared3.TargetIndex,
-                                  self.state.DistToTarg,
-                                  self.state.theta_e,
-                                  self.state.theta_d,
-                                 )
            return 1
  
  # Wheel length 0.8m -  745 pulses/s= 2pi rad/s
@@ -187,8 +194,9 @@ class Robotmove(threading.Thread):
                          self.shared5.RmotorFR=RmotDir
                          self.shared5.Rspeed = impR
                          self.shared5.Cutter_RunStop= self.shared3.CuttMot
-                         self.shared5.Transmit=1 
-                         #print("motor tx... impL, impR :  ",impL, impR )
+                         self.shared5.Transmit=1
+           else:
+             print("Serial TX busy")                                # debug info      
        
 # ---------------------- Waypoints --------------------
    def loadGeojsonWaypoints(self):
@@ -210,41 +218,33 @@ class Robotmove(threading.Thread):
         for item in self.shared3.Waypoints:
             self.cx.append(item[0])
             self.cy.append(item[1])
-
-        
+    
         self.cx.insert(0, float(self.shared1.long))                   # first point, robot start location
         self.cy.insert(0, float(self.shared1.lat)) 
 
         self.cyaw=rstanley.yaw_calc(self.state, self.cx, self.cy, self.shared2.Direction) 
 
         self.shared3.Max_targetIndex=len(self.cx)-1
-        print("Max target index  :",self.shared3.Max_targetIndex)
+        #print("Max target index  :",self.shared3.Max_targetIndex)
 
-        print("cx:",self.cx)
-        print("cy:",self.cy)
-        print("cyaw:",self.cyaw)
+        #print("cx:",self.cx)
+        #print("cy:",self.cy)
+        #print("cyaw:",self.cyaw)
 
   #----------------  Drive modes ------------- 
 
    def AutomaticDriveMode(self):
-      # self.Validation=True
-    
+      
       if ( self.shared3.start==True)and(self.shared3.stop==False):
-
-          rstanley.State.update(self.state, self.shared1.long, self.shared1.lat, self.shared2.Direction, self.shared2.SpeedV, self.shared3.TargetSpeed ) 
-
-          self.shared3.SpeedV, self.shared3.SpeedW = rstanley.calcmotion(self.state, self.cx, self.cy, self.cyaw )
+         
+          rstanley.State.update(self.state, self.shared1.long, self.shared1.lat, self.shared2.Direction, self.shared3.SpeedV_meas, self.shared3.TargetSpeed, self.shared3.k_td,  self.shared3.k_te, self.shared3.Kstear) 
+          
+          self.shared3.SpeedV, self.shared3.SpeedW, self.shared3.PathLateralError,  self.shared3.Safe_zone = rstanley.calcmotion(self.state, self.cx, self.cy, self.cyaw )
 
           self.shared3.TargetIndex=self.state.target_idx               # to web
           self.shared3.last_TargetIndex=self.state.target_idx
 
-
-          if ( self.shared3.pause==False):
-               self.Motors(self.shared3.SpeedV, self.shared3.SpeedW)
-          else:
-               self.Motors(0,0) 
-
-          if ( self.state.target_idx> self.shared3.Max_targetIndex ):  # all  waypints targets acquired, STOP
+          if ( self.state.target_idx> self.shared3.Max_targetIndex ):  # all  waypoints targets acquired, STOP
                 self.shared3.CuttMot=False
                 self.state.target_idx=1
                 self.shared3.SpeedV=0
@@ -252,12 +252,16 @@ class Robotmove(threading.Thread):
                 self.Motors(0,0)
                 self.shared3.start=False
                 print("Automatic mode end: last target")
+          else:     
 
-          print("speed V: ",self.shared3.SpeedV )
-          print("speed W: ",self.shared3.SpeedW )
-                
+              if ( self.shared3.pause==False)and(self.shared3.Safe_zone==True):  
+                   self.Motors(self.shared3.SpeedV, self.shared3.SpeedW)
+              else:
+                   self.Motors(0,0)
+                   print("PAUSE active")
+                          
       
-      if ( self.shared3.stop==True)and(self.shared3.start==False):
+      if ( self.shared3.stop==True)and(self.shared3.start==False):     # STOP button
            
            self.shared3.CuttMot=False
            self.shared3.SpeedV=0
@@ -296,9 +300,7 @@ class Robotmove(threading.Thread):
 
                   if(speedmanual>0.5): speedmanual=0.5              
                   self.Motors(speedmanual,radmanual, self.direction, "manual") 
-
-                  #print("speed m/s:",speedmanual)
-                  #print("angle rad :",radmanual) 
+                 
            else:
                self.Motors(0,0, "S")                                         # joistick inactive
                  
@@ -310,7 +312,6 @@ class Robotmove(threading.Thread):
                     self.shared5.RmotorFR="F"
                     self.shared5.Lspeed = 0
                     self.shared5.Rspeed = 0
-
                     self.shared5.Transmit=1
                     self.manual_trig=False
 
@@ -319,12 +320,11 @@ class Robotmove(threading.Thread):
 
 #----------------------------------------------        
    def run (self):  
-
        self.loadGeojsonWaypoints() 
        self.WaypointPrepare()
 
        while(1):
-
+          
           if (self.shared3.NewSelectedWaypoint==True):
               self.loadGeojsonWaypoints() 
               self.WaypointPrepare()
@@ -334,14 +334,17 @@ class Robotmove(threading.Thread):
           #self.GNSSvalidation()
           self.ManualDriveMode()
 
-          if (self.shared3.manual==False): 
-             if (self.shared2.PacketCnt>self.oldpacketcnt2):           # only after new data from MCU  (~200 ms) TODO : 100 ms
-                   self.AutomaticDriveMode()
-                   self.oldpacketcnt2=self.shared2.PacketCnt
-          else :  
+          if (self.shared3.Safe_zone==False)or(self.shared2.Estop>0):
+               self.shared3.Robot_status=False
+          else:
+               self.shared3.Robot_status=True      
+   
+          if (self.shared2.PacketCnt>self.oldpacketcnt2):                  # only after new data from MCU  (~200 ms) TODO : 100 ms
+                self.LogData()
 
-             if ( self.shared3.manual==False): self.Motors(0, 0,"F")   # Start not active, or Stop button pressed
+                if (self.shared3.manual==False):
+                    self.AutomaticDriveMode()      
+                self.oldpacketcnt2=self.shared2.PacketCnt     
             
-
-         #  self.shared2.AddRecord(RTKdata[2],RTKdata[3],RTKdata[5])
-          time.sleep(0.02) #20 ms refresh rate       
+          # self.shared2.AddRecord(RTKdata[2],RTKdata[3],RTKdata[5])
+          time.sleep(0.002)                                                #2 ms refresh rate       

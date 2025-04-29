@@ -21,22 +21,12 @@ class rserial(threading.Thread):
       
    def RXdata (self,lock):
            while (True):
-               
-               # Check if incoming bytes are waiting to be read from the serial input 
-               # buffer.
-               # NB: for PySerial v3.0 or later, use property `in_waiting` instead of
-               # function `inWaiting()` below!
+
                if (self.ser.inWaiting() > 0):
                    # read the bytes 
                    self.data_str = self.ser.read(self.ser.inWaiting())   # dec format    #.decode('ascii')   # .hex()  # .decode('utf-8').rstrip()   
-                   # print the incoming string without putting a new-line
-                   # ('\n') automatically after every print()
-                   #print(data_str, end='') 
-                   #print(self.data_str)
                    self.decode(lock)
-                   # Optional, but recommended: sleep 10 ms (0.01 sec) once per loop to let 
-                   # other threads on your PC run during this time.
-               #self.ser.write('test1'.encode('utf-8'))
+                  
                time.sleep(0.01)
                self.TXdata(lock)
 
@@ -54,10 +44,10 @@ class rserial(threading.Thread):
                 txarray[6]=0x45   # E 
 
                 self.ser.write(txarray)
-               # print(hex(txarray))
+                #print(txarray)
                 lock.acquire()
                 self.shared2.Transmit=0   
-                time.sleep(0.02)
+                time.sleep(0.01)
                 lock.release()
 
                 
@@ -71,7 +61,7 @@ class rserial(threading.Thread):
            Dir2=0
            cnt1=0
            cnt2=0
-
+ 
            if (len(self.data_str) ==17) and (self.data_str[0]==84)and (self.data_str[16]==69):  # dec
 
                if (self.data_str[1] & 0b1):   Estop2=1
@@ -86,14 +76,12 @@ class rserial(threading.Thread):
                Dir2=self.data_str[6]<<4
                Dir2=Dir2 | self.data_str[7]
                if (Dir2 <0) or (Dir2>360): Dir2=-1
-               #print("Dir2:",Dir2)
                
                cnt1=self.data_str[8]<<24
                cnt1=cnt1 | self.data_str[9]<<16
                cnt1=cnt1 | self.data_str[10]<<8
                cnt1=cnt1 | self.data_str[11]
-               #print("cnt1:",cnt1)
-               
+                  
                cnt2=self.data_str[12]<<24
                cnt2=cnt2 | self.data_str[13]<<16
                cnt2=cnt2 | self.data_str[14]<<8

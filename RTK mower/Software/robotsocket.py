@@ -13,7 +13,7 @@ import threading
 
 import datetime
 
-host = '192.168.xx.xx'  #  change
+host = 'xx.xx.xx.xx'  # change to robot IP
 port = 5555
 
 RTKdata= ["0", "0", "0","0", "0", "0","0", "0", "0","0", "0", "0","0", "0", "0","0","0","0","0","0",]
@@ -53,8 +53,8 @@ class TCPconnect(threading.Thread):
         self.shared.PacketCnt+=1  
         self.shared.GPSTdate=RTKdata[0]
         self.shared.GPSTtime=RTKdata[1] 
-        self.shared.lat=float(RTKdata[2])+self.shared3.LatOffset 
-        self.shared.long=float(RTKdata[3])+self.shared3.LongOffset 
+        self.shared.lat=float(RTKdata[2])
+        self.shared.long=float(RTKdata[3])
         self.shared.height=float(RTKdata[4]) 
         self.shared.Q=int(RTKdata[5]) 
         self.shared.ns=int(RTKdata[6]) 

@@ -73,8 +73,6 @@ bool M2dir=true;
 bool M1stop=false;
 bool M2stop=false;
 
-bool M1dirold=true;        // For direction change delay.
-bool M2dirold=true;
 bool cutMot=false;         // Cutting motor  ON/OFF
 
 int  rxWdt=0;              // If serial not active turn motors off
@@ -316,34 +314,36 @@ unsigned long Encoder2cnt=0;
 
 //--------- Simple PI for motors ----
 // 745 imp/s -> 60 RPM 
-float P=2.5;        // PID P
+float P=1.8;        // PID P   old 2.5
 char  I=2;          // PID I 
 long delta1 =0;
 long delta2 =0;
-int dirspeed=10;
+int dirspeed=10;    // Slow before change direction
 
 //  Left motor
 void Motor1Speed()
 {
-  if (M1dirSet!=M1dir)   // for direction change
+  int imp1_target = setimp1;
+  if (M1dirSet!=M1dir)         // for direction change
   {
-    setimp1=dirspeed; 
+    imp1_target=dirspeed; 
       if(imp1<=20) 
         {
           M1dir=M1dirSet;
+          imp1_target=setimp1;  
         }
   }
-  delta1=abs(imp1-setimp1); 
+  delta1=abs(imp1-imp1_target); 
 //----- P -----
-  if ( (imp1 <setimp1)&&(delta1>=P))
+  if ( (imp1 <imp1_target)&&(delta1>=P))
      PWM1=PWM1+int(delta1*P);
    
-  if ((imp1 >setimp1)&&(delta1>=P))
+  if ((imp1 >imp1_target)&&(delta1>=P))
      PWM1=PWM1-int(delta1*P); 
 //---- I ----
-  if (imp1 <setimp1)
+  if (imp1 <imp1_target)
      PWM1=PWM1+I;
-  if (imp1 >setimp1)
+  if (imp1 >imp1_target)
      PWM1=PWM1-I;
  
   if (PWM1>292) { PWM1=292; }      // H bridge limit max 292
@@ -358,25 +358,27 @@ void Motor1Speed()
 // Right motor
 void Motor2Speed()
 {
-   if (M2dirSet!=M2dir)  // for direction change
+   int imp2_target = setimp2;
+   if (M2dirSet!=M2dir)         // for direction change
   {
-    setimp2=dirspeed; 
+    imp2_target=dirspeed; 
       if(imp2<=20) 
         {
           M2dir=M2dirSet;
+          imp2_target=setimp2;
         }
   }
-  delta2=abs(imp2-setimp2); 
+  delta2=abs(imp2-imp2_target); 
 //----- P -----
-  if ((imp2 <setimp2)&&(delta2>=P))
+  if ((imp2 <imp2_target)&&(delta2>=P))
    PWM2=PWM2+int(delta2*P);
    
-  if ((imp2 >setimp2)&&(delta2>=P))
+  if ((imp2 >imp2_target)&&(delta2>=P))
    PWM2=PWM2-int(delta2*P); 
 //---- I ----
-  if (imp2 <setimp2)
+  if (imp2 <imp2_target)
    PWM2=PWM2+I;
-   if (imp2 >setimp2)
+   if (imp2 >imp2_target)
    PWM2=PWM2-I;
     
   if (PWM2>292) { PWM2=292; }  
@@ -412,7 +414,7 @@ void interuptas(void)
   Motor2Speed();
   Wdt();
   Motors();
-  t100ms=t100ms+1;
+  //t100ms=t100ms+1;
 
   if(t100ms2>=0) t100ms2=t100ms2+1;    // For status led
   if(t100ms2>=10) t100ms2=0;  
@@ -580,6 +582,7 @@ void LED()
 // 7 bit packet:  "S"; Lmotor F/R; Lmotor speed;  Rmotor F/R; Rmotor speed; Run/Stop; "E"    // todo + CRC
 // test packet R  0X53 0x46 0x10 0x46 0x10 0x01 0x45 
 //             F  0X53 0x52 0x10 0x52 0x10 0x00 0x45 
+//          STOP  0X53 0x46 0x00 0x46 0x00 0x00 0x45
 int inByte = 0;
 bool packetStart =false;
 bool packetStop  =false;
