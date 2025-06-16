@@ -45,6 +45,13 @@ How to compile arduino code:
 - Run main python file „RTKrobot\RTK mower\Software\robotmain.py“
 - Graphical user interface is accessible via robotIP:8050
 
+** highlights:**
+
+- In the QGIS software, create a grid of 25x25 cm (depending on the width of the robot). Based on it, you can easily draw waypoints in the next layer that the robot will use.
+- From the launch position, the robot moves in a straight line towards the first waypoint.
+- Since the robot uses a tilt compensated compass, it is very important to properly calibrate the LSM303 magnetometer and accelerometer.
+
+
 **Todo list:**
 
 - [x]  Add obstacle avoidance function ( only stop )

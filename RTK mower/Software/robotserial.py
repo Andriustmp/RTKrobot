@@ -106,8 +106,4 @@ class rserial(threading.Thread):
    def  AngleCorection(self, angle):
         angle_cor = (angle+self.shared3.compasss_corection)%360
         return (angle_cor)
-
-                  
-
-               
-               
+             

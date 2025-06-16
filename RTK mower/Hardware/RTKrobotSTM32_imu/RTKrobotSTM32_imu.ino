@@ -829,9 +829,9 @@ void loop()   // Loop time ~ 153-1732 us
   LED();
   UartRX();
   
-  if (millis() - interval2 >= 200)
+  if (millis() - interval2 >= 100)          // 100 ms
   { 
-   AnalogIn();
+   //AnalogIn();
    UartTX();                                // Trasnsmit telemetry data 
    interval2 = millis();  
    digitalWrite(PC13, !digitalRead(PC13));  // STM Board Led blink

@@ -15,10 +15,10 @@ import socket
 import csv
 import time
 
-from robotserial import rserial
-from robotwww import robotweb
-from robotsocket import TCPconnect
-from navigation import Robotmove
+from robotserial  import rserial
+from robotwww     import robotweb
+from robotsocket  import TCPconnect
+from navigation   import Robotmove
 
 from sshkeyboard import listen_keyboard
 
@@ -52,13 +52,14 @@ class RXData:
 class RTKdata:
       def __init__ (self ):
          self.PacketCnt = 0
+         self.ValidConn=False
          self.GPSTdate  = ''
          self.GPSTtime  = ''
-         self.lat       =               # y, format llh
-         self.long      =               # x  
+         self.lat       =                   # y, format llh
+         self.long      =                   # x  
          self.height = ''  
-         self.Q      = ''               # 1 - fix, 2 - float (ok  =1;2)
-         self.ns     = ''               # valid satellites  ( Ok >=12
+         self.Q      = ''                   # 1 - fix, 2 - float (ok  =1;2)
+         self.ns     = ''                   # valid satellites  ( Ok >=12
          self.sdn    = ''
          self.sde    = ''
          self.sdu    = ''
@@ -66,7 +67,7 @@ class RTKdata:
          self.sdeu   = ''
          self.sdun   = ''
          self.age    = ''      
-         self.ratio  = ''               #  RTKLIB def thresh=3.00
+         self.ratio  = ''                    #  RTKLIB def thresh=3.00
          
       def return_class_variables(self):
           return(self.__dict__)   
@@ -84,26 +85,27 @@ class Parametrai:
         self.Jangle   = 0
         self.Jforce   = 0
 
-        self.compasss_corection  = 8          # Magnetic declination ( set by location )                
+        self.compasss_corection  = 5          # Magnetic declination ( set by location )  # 8.0              
         self.SpeedV              = 0          # linear velocity  m/s
         self.SpeedW              = 0          # angular velocity rad/s
         self.SpeedV_meas         = 0
         
         self.TargetSpeed         = 0.5        # m/s  (1 m/s - 3.6 km/h)
-        self.k_td                = 1.4        # theta_d ( atstumo kor.) lateral Error gain   0.0013 
-        self.k_te                = 0.65       # theta_e ( kampo kor. )  yaw     Error gain   0.8
-        self.Kstear              = 0.03       # steering overshoot compensation 0.06
+        self.k_td                = 1.4        # theta_d  lateral Error gain   
+        self.k_te                = 0.65       # theta_e  yaw     Error gain   
+        self.Kstear              = 0.03       # steering overshoot compensation 
 
         self.Waypoints           = []
-        self.TargetIndex         = 0          # running index ( to gui)
+        self.TargetIndex         = 0          # running index (to gui)
         self.last_TargetIndex    = 0          # last acquired index 
         self.Max_targetIndex     = 0          # last target index from Waypoints
         self.DistToTarget        = 0
         self.DistToTargetmin     = 0
         self.Safe_zone           = True       # safe zone between Waypoints in auto mode 
+        self.GNSS_valid          = False      # GNSS signall validation
         self.Robot_status        = True       # combined error
         self.PathLateralError    = 0            
-        self.WaypointSelected    = 'Waypoints/TestLinija.geojson'  # selected from GUI
+        self.WaypointSelected    = 'Waypoints/TestWaypoints.geojson'  # selected from GUI
         self.NewSelectedWaypoint = False
        
       def return_class_variables(self):
@@ -145,21 +147,8 @@ class DataRecord:
     def return_class_variables(self):
          return(self.__dict__)
 
-# tmp
-class Temp: 
-      def __init__ (self ): 
-        self.pirmas=1
-        self.antras=2
-        self.trecias=3
-        self.ketvirtas=4
-         
-      def return_class_variables(self):
-          return(self.__dict__) 
-
-
 def WriteLogToFile(to_csv):
 
-   # keys = to_csv[0].keys()
     keys= ['lat', 'long', 'Q', 'yaw','v', 'w','Tidx','DistToTarg','Theta_e','Theta_d']
 
     with open('RLog-'+timestr+'.csv', 'a', newline='') as output_file:
@@ -170,7 +159,6 @@ def WriteLogToFile(to_csv):
 def shutdown():
     if (param.shutdown):
       os.system('sudo shutdown now')
-
 
 #-------- SSH Keybord for test ----
 def press(key):
@@ -184,9 +172,9 @@ def press(key):
 
 def release(key):
     #print(f"'{key}' released")    
-    b=1
+    b=1   
+    
 #---------------------------------
-
 cnt1=0
 if __name__ == '__main__' :
     now = datetime.datetime.now()
@@ -194,26 +182,25 @@ if __name__ == '__main__' :
     print("RTK robot v1.4")
     print(now.strftime("%Y-%m-%d %H:%M:%S"))
 
-    rx=       RXData()           #  MCU Serial data
-    tx=       TXData()
-    roverpos= RTKdata()          #  GNSS receiver data
-    tmp=      Temp()
-    param=    Parametrai()
-    DataRec=  DataRecord()
+    rx =       RXData()           #  MCU Serial data
+    tx =       TXData()
+    roverpos = RTKdata()          #  GNSS receiver data
+    tmp =      Temp()
+    param =    Parametrai()
+    DataRec =  DataRecord()
 
-    lock=threading.Lock()
-    Serialthr1=   rserial(shared=rx, shared2=tx, shared3=param )
-    TcpSocket= TCPconnect(shared=roverpos, shared2=DataRec, shared3=param)
-    web1=        robotweb(shared=roverpos, shared2=rx, shared3=param, shared4=DataRec)
-    navi=       Robotmove(shared=roverpos, shared2=rx, shared3=param, shared4=DataRec, shared5=tx)
+    lock =threading.Lock()
+    Serialthr1 =   rserial(shared=rx, shared2=tx, shared3=param )
+    TcpSocket = TCPconnect(shared=roverpos, shared2=DataRec, shared3=param)
+    web1 =        robotweb(shared=roverpos, shared2=rx, shared3=param, shared4=DataRec)
+    navi =       Robotmove(shared=roverpos, shared2=rx, shared3=param, shared4=DataRec, shared5=tx)
 
-    t1= threading.Thread(target=Serialthr1.RXdata, daemon=True, args=(lock,))
-    t2= threading.Thread(target=TcpSocket.run, daemon=True )
-    t3= threading.Thread(target=web1.run, daemon=True)
-    t4= threading.Thread(target=navi.run, daemon=True)
+    t1 = threading.Thread(target=Serialthr1.RXdata, daemon=True, args=(lock,))
+    t2 = threading.Thread(target=TcpSocket.run, daemon=True )
+    t3 = threading.Thread(target=web1.run, daemon=True)
+    t4 = threading.Thread(target=navi.run, daemon=True)
 
-
-    t1.start()   # Robot MCU serial com    ( RX interval 200 mS )
+    t1.start()   # Robot MCU serial com    ( RX interval 100 mS )
     t2.start()   # GNSS reciver TCP client ( TCP socket  data interval 5 Hz )
     t3.start()   # HTTP GUI server
     
@@ -233,10 +220,9 @@ if __name__ == '__main__' :
         if (rx.Recived==1):
             #print(rx.__dict__)
             rx.Recived=0
-            #print(rx.PacketCnt)
-            while ( rx.Recived!=0 ):                   # If thread is still writing, wait
+            while ( rx.Recived!=0 ):                    # If thread is still writing, wait
                 if(lock.locked()==False): rx.Recived=0
         
         time.sleep(0.01)
         shutdown();
-           
+        

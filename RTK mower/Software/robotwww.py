@@ -1,12 +1,12 @@
 """
  RTK robot mower V 1.4
- WEB user interface  x.x.x.x:8050
+ WEB user interface  x.x.x.x:8050   # Robot Mower IP
  2024 05 23
  author: A. Besusparis
 """
 
 import logging
-log = logging.getLogger('werkzeug')
+log  = logging.getLogger('werkzeug')
 log.setLevel(logging.ERROR)
 
 import os
@@ -37,7 +37,6 @@ class robotweb(threading.Thread):
           with open(self.shared3.WaypointSelected, 'r') as f:
                self.geojson = json.load(f)
           
-
     def ListFiles(self):
             file_names = os.listdir("Waypoint")
             return file_names      
@@ -63,9 +62,7 @@ class robotweb(threading.Thread):
         else: start=0   
 
         for index in range(start, logitems ):
-           # x.append(self.shared4.log1[index]['lat'])
-           # y.append(self.shared4.log1[index]['long'])
-           # Q.append(self.shared4.log1[index]['Q'])
+
             yaw.append(self.shared4.log1[index]['yaw'])
             speedV.append(self.shared4.log1[index]['v'])
             speedW.append(self.shared4.log1[index]['w'])
@@ -88,7 +85,7 @@ class robotweb(threading.Thread):
                      dl.Map( children=[                                                        # The Map object needs a list of element
                                        dl.Marker(position=self.pozicija, id='position-data'),
                                        dl.GeoJSON(url="/assets/MapTest2.geojson", id="states"),
-                                       dl.GeoJSON(url=self.Waypoint_selected, id='Waiponts_map', options={"style":{"color":" #df8400","weight":"1"}}),  
+                                       dl.GeoJSON(data=self.geojson, id='Waiponts_map', options={"style":{"color":" #df8400","weight":"1"}}), 
                                       ], 
                                       center=(55.2295, 25.7254), zoom=20, style={'height': '60vh'}  
                             ), 
@@ -520,7 +517,6 @@ class robotweb(threading.Thread):
             self.shared3.Kstear = p3
             return "inpt1: {}, inpt2: {}, inpt3: {}".format(self.shared3.k_td, self.shared3.k_te, self.shared3.Kstear)
 
-
         #---------------Live data table-----------
         @app.callback(
                       Output('live_table','data'),
@@ -530,7 +526,6 @@ class robotweb(threading.Thread):
         def update_table(n):              
             data2=[{'parametras':i, 'verte':m} for i, m in self.tmp1[0].items()]      # Refresh data table 
             return  data2 
-
 
         #---------- Map + Gauges ---------
 

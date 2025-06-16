@@ -13,7 +13,7 @@ import threading
 
 import datetime
 
-host = 'xx.xx.xx.xx'  # change to robot IP
+host = 'xx.xx.xx.xx'  # Robot Mower IP
 port = 5555
 
 RTKdata= ["0", "0", "0","0", "0", "0","0", "0", "0","0", "0", "0","0", "0", "0","0","0","0","0","0",]
@@ -25,7 +25,9 @@ class TCPconnect(threading.Thread):
         self.shared2 = shared2
         self.shared3 = shared3
         if sock is None:
-            self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)                              
+            self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM) 
+            self.sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+            self.sock.settimeout(5)                             
         else:
             self.sock = sock
 
@@ -36,20 +38,39 @@ class TCPconnect(threading.Thread):
         except:
             print('RTKrcv TCP Connection Failed')
 
-    def readlines(self):
-        data = self.sock.recv(1024).decode()
-        x = data.split()
-        RTKdata=x;
-        self.decode(RTKdata)
-        #print(RTKdata)
-        #print(data.decode())
+    def readlines(self):    
+        data=False 
+        try:
+            data = self.sock.recv(1024).decode()
+            
+        except socket.error as e:
+            print(f"Error during data exchange: {e}")
+                 
+        if  data: 
+            x = data.split()
+            RTKdata=x;
+            self.decode(RTKdata)
+        else:
+            self.sock.close()
+            time.sleep(2)
+            #print("TCP socket: no data from RTKrcv, reconecting ...")
+            self.shared.ValidConn=False
+            self.sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            self.sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
+
+            try:
+                 self.sock.connect((host, port))
+                 print('TCP socket: reconnected')
+            except:
+                 print('TCP socket: reconnect failed')
 
     def run(self):
-        self.connect(host,port)   # todo:  reconect on fail/restart service
+        self.connect(host,port)   
         while True:
            self.readlines()
 
     def decode(self, RTKdata):
+        self.shared.ValidConn=True
         self.shared.PacketCnt+=1  
         self.shared.GPSTdate=RTKdata[0]
         self.shared.GPSTtime=RTKdata[1] 
@@ -67,5 +88,4 @@ class TCPconnect(threading.Thread):
         self.shared.age=RTKdata[13] 
         self.shared.ratio=float(RTKdata[14]) 
 
-        #self.shared2.AddRecord(RTKdata[2],RTKdata[3],RTKdata[5])
-               
+        #self.shared2.AddRecord(RTKdata[2],RTKdata[3],RTKdata[5])              
