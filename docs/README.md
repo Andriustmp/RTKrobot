@@ -46,7 +46,7 @@ How to compile arduino code:
 - Run main python file „RTKrobot\RTK mower\Software\robotmain.py“
 - Graphical user interface is accessible via robotIP:8050
 
-** highlights:**
+**Highlights:**
 
 - In the QGIS software, create a grid of 25x25 cm (depending on the width of the robot). Based on it, you can easily draw waypoints in the next layer that the robot will use.
 - From the launch position, the robot moves in a straight line towards the first waypoint.
